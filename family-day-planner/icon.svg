@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Family Day Builder sun icon">
+  <rect width="512" height="512" rx="112" fill="#17324d"/>
+  <circle cx="256" cy="236" r="112" fill="#ffd45c"/>
+  <g stroke="#ffd45c" stroke-width="28" stroke-linecap="round">
+    <path d="M256 62v38M256 372v38M82 236h38M392 236h38M133 113l27 27M352 332l27 27M379 113l-27 27M160 332l-27 27"/>
+  </g>
+  <path d="M180 244c22 48 130 48 152 0" fill="none" stroke="#17324d" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="214" cy="208" r="14" fill="#17324d"/>
+  <circle cx="298" cy="208" r="14" fill="#17324d"/>
+  <path d="M134 430c50-60 194-60 244 0" fill="none" stroke="#b9eee9" stroke-width="34" stroke-linecap="round"/>
+</svg>
