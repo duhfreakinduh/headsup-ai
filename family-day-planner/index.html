@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#17324d" />
+  <meta name="description" content="Build a kid-friendly local itinerary from your location, free hours, budget, interests, and weather." />
+  <title>Family Day Builder</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <style>
+    :root{
+      --ink:#17263a;--muted:#677489;--paper:#fffdf8;--cream:#f7efe2;--peach:#ffcfb6;
+      --sun:#ffd45c;--aqua:#b9eee9;--blue:#17324d;--white:#fff;--line:#e7ded0;
+      --good:#166f5b;--danger:#a83b3b;--shadow:0 18px 50px rgba(23,50,77,.12);
+      font-family:Inter,ui-rounded,"Avenir Next",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      color:var(--ink);background:var(--cream);font-synthesis:none;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:
+      radial-gradient(circle at 8% 0%,rgba(185,238,233,.75),transparent 28rem),
+      radial-gradient(circle at 100% 18%,rgba(255,207,182,.72),transparent 26rem),
+      var(--cream)}
+    button,input,select{font:inherit}
+    button{cursor:pointer}
+    a{color:inherit}
+    .shell{width:min(980px,100%);margin:auto;padding:20px 16px 70px}
+    .topbar{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:var(--sun);
+      box-shadow:0 9px 22px rgba(172,128,0,.18);font-size:26px}
+    .brand h1{font-size:clamp(1.35rem,4vw,2rem);margin:0;letter-spacing:-.04em}
+    .brand p{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+    .pill{border:1px solid rgba(23,50,77,.13);background:rgba(255,255,255,.65);backdrop-filter:blur(10px);
+      color:var(--ink);border-radius:999px;padding:9px 12px;font-weight:750}
+    .hero{background:linear-gradient(135deg,var(--blue),#29597d);color:white;border-radius:28px;padding:24px;
+      box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .hero:after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;right:-50px;top:-70px;
+      background:rgba(255,212,92,.22)}
+    .hero h2{font-size:clamp(1.8rem,7vw,3.4rem);line-height:.98;max-width:700px;margin:0;letter-spacing:-.055em}
+    .hero p{max-width:620px;color:#dceaf4;font-size:1rem;line-height:1.55;margin:14px 0 0}
+    .grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:18px;margin-top:18px}
+    .card{background:rgba(255,253,248,.94);border:1px solid rgba(255,255,255,.7);border-radius:24px;padding:20px;
+      box-shadow:var(--shadow)}
+    .card h3{margin:0 0 4px;font-size:1.15rem}
+    .card-sub{margin:0 0 16px;color:var(--muted);font-size:.9rem;line-height:1.45}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+    label{display:block;font-size:.78rem;font-weight:800;color:#4d5d70;margin:0 0 6px}
+    .field{min-width:0}
+    .field.full{grid-column:1/-1}
+    input,select{width:100%;border:1px solid var(--line);background:white;color:var(--ink);border-radius:14px;
+      padding:12px 13px;outline:none;transition:.18s}
+    input:focus,select:focus{border-color:#54a6a0;box-shadow:0 0 0 4px rgba(84,166,160,.14)}
+    .input-action{display:grid;grid-template-columns:1fr auto;gap:8px}
+    .mini-btn{border:0;border-radius:13px;padding:0 13px;background:var(--aqua);color:#124842;font-weight:850}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .chip input{position:absolute;opacity:0;pointer-events:none}
+    .chip span{display:block;border:1px solid var(--line);background:white;border-radius:999px;padding:9px 11px;
+      font-size:.84rem;font-weight:750;transition:.16s}
+    .chip input:checked+span{background:var(--aqua);border-color:#76cfc7;color:#124842;transform:translateY(-1px)}
+    .primary{width:100%;border:0;border-radius:16px;padding:14px 16px;background:var(--sun);color:#3e3100;
+      font-weight:900;font-size:1rem;box-shadow:0 10px 24px rgba(197,151,0,.22);margin-top:16px}
+    .primary:disabled{opacity:.55;cursor:wait}
+    .privacy{display:flex;gap:8px;color:var(--muted);font-size:.75rem;line-height:1.4;margin-top:10px}
+    .sample{display:grid;gap:10px}
+    .sample-row{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:17px;padding:12px;background:#fff}
+    .time{font-size:.78rem;font-weight:900;color:#d84f73;min-width:68px}
+    .sample-row strong{display:block;font-size:.9rem}
+    .sample-row small{display:block;color:var(--muted);margin-top:3px;line-height:1.35}
+    .trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:13px}
+    .trust div{background:#f8f4ec;border-radius:14px;padding:10px;text-align:center}
+    .trust strong{display:block;font-size:.83rem}
+    .trust span{display:block;color:var(--muted);font-size:.7rem;margin-top:2px}
+    .results{display:none;margin-top:18px}
+    .results.show{display:block}
+    .result-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+    .result-head h2{margin:0;font-size:1.55rem;letter-spacing:-.035em}
+    .result-head p{margin:4px 0 0;color:var(--muted)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .secondary{border:1px solid var(--line);background:white;border-radius:999px;padding:9px 12px;font-weight:800}
+    .weather{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:20px;padding:14px 16px;
+      background:linear-gradient(135deg,#fff7d7,#e2f8f5);border:1px solid white;margin-bottom:12px}
+    .weather strong{display:block}
+    .weather small{color:var(--muted)}
+    .weather-icon{font-size:1.8rem}
+    .timeline{display:grid;gap:12px}
+    .stop{display:grid;grid-template-columns:78px 1fr;gap:14px;background:var(--paper);border-radius:22px;padding:16px;
+      border:1px solid rgba(23,50,77,.08);box-shadow:0 10px 30px rgba(23,50,77,.08);position:relative}
+    .stop:before{content:"";position:absolute;left:92px;top:16px;bottom:16px;width:2px;background:#eee1d2}
+    .stop-time{font-size:.82rem;font-weight:900;color:#d84f73;padding-top:3px}
+    .stop-body{padding-left:15px;min-width:0}
+    .stop-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .stop h3{font-size:1.08rem;margin:0}
+    .badge{white-space:nowrap;border-radius:999px;padding:6px 8px;background:#fff1c1;color:#765b00;font-size:.7rem;font-weight:900}
+    .meta{color:var(--muted);font-size:.82rem;margin:5px 0 0;line-height:1.4}
+    .why{font-size:.88rem;line-height:1.46;margin:11px 0;color:#334459}
+    .stop-links{display:flex;gap:8px;flex-wrap:wrap}
+    .link-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none;border-radius:999px;padding:8px 10px;
+      background:#e8f7f5;color:#155b54;font-size:.77rem;font-weight:850}
+    .check{display:inline-flex;align-items:center;gap:6px;font-size:.77rem;font-weight:800;color:var(--muted)}
+    .check input{width:auto}
+    .status{display:none;border-radius:18px;padding:14px 16px;margin-top:12px;background:#fff;border:1px solid var(--line);color:var(--muted)}
+    .status.show{display:block}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid #c7d1d7;border-top-color:var(--blue);
+      border-radius:50%;animation:spin .7s linear infinite;vertical-align:-3px;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .saved{margin-top:18px}
+    .saved-list{display:grid;gap:8px}
+    .saved-item{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid var(--line);
+      border-radius:16px;padding:11px 12px;background:white}
+    .saved-item strong{display:block;font-size:.87rem}
+    .saved-item small{color:var(--muted)}
+    .delete{border:0;background:#fae7e7;color:var(--danger);border-radius:10px;padding:7px 9px;font-weight:800}
+    .empty{color:var(--muted);font-size:.85rem;line-height:1.45}
+    .live-link{display:block;text-align:center;margin-top:12px;border:1px dashed #8dcac5;border-radius:16px;padding:12px;
+      text-decoration:none;color:#155b54;font-weight:850;background:#effaf8}
+    footer{color:var(--muted);font-size:.75rem;line-height:1.5;text-align:center;margin-top:22px}
+    @media(max-width:760px){
+      .grid{grid-template-columns:1fr}.sample-card{order:2}.form-grid{grid-template-columns:1fr}
+      .field.full{grid-column:auto}.hero{padding:21px}.shell{padding-inline:12px}.topbar{align-items:flex-start}
+      .pill{font-size:.75rem}.result-head{display:block}.actions{justify-content:flex-start;margin-top:10px}
+    }
+    @media(max-width:460px){
+      .brand p{display:none}.logo{width:42px;height:42px;border-radius:14px}.card{padding:16px;border-radius:20px}
+      .stop{grid-template-columns:64px 1fr;padding:14px}.stop:before{left:76px}.stop-body{padding-left:11px}
+      .stop-top{display:block}.badge{display:inline-block;margin-top:7px}.trust{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">☀️</div>
+        <div><h1>Family Day Builder</h1><p>Turn free hours into a family plan.</p></div>
+      </div>
+      <button class="pill" id="installBtn" hidden>Install app</button>
+    </header>
+
+    <section class="hero">
+      <h2>A whole kid-friendly day, planned in under a minute.</h2>
+      <p>Choose the ages, location, schedule, budget, and interests. The app checks live weather and nearby family places, then builds a practical stop-by-stop itinerary.</p>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Build your day</h3>
+        <p class="card-sub">Prefilled for a Fort Worth family with kids ages 5 and 10. Change anything below.</p>
+        <form id="plannerForm">
+          <div class="form-grid">
+            <div class="field">
+              <label for="ages">Kids' ages</label>
+              <input id="ages" value="5, 10" inputmode="numeric" placeholder="Example: 5, 10" required />
+            </div>
+            <div class="field">
+              <label for="date">Day</label>
+              <input id="date" type="date" required />
+            </div>
+            <div class="field full">
+              <label for="location">City or ZIP code</label>
+              <div class="input-action">
+                <input id="location" value="Fort Worth, TX" placeholder="Fort Worth, TX" required />
+                <button class="mini-btn" type="button" id="locateBtn">Use GPS</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="startTime">Start time</label>
+              <input id="startTime" type="time" value="09:00" required />
+            </div>
+            <div class="field">
+              <label for="hours">Hours to fill</label>
+              <select id="hours">
+                <option value="2">2 hours</option><option value="3">3 hours</option>
+                <option value="4">4 hours</option><option value="5">5 hours</option>
+                <option value="6" selected>6 hours</option><option value="7">7 hours</option>
+                <option value="8">8 hours</option><option value="9">9 hours</option><option value="10">10 hours</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="budget">Budget</label>
+              <select id="budget">
+                <option value="free">Free only</option>
+                <option value="low" selected>Mostly free / low-cost</option>
+                <option value="flexible">Flexible</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="energy">Energy level</label>
+              <select id="energy">
+                <option value="easy">Keep it easy</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="active">Wear them out</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label>What sounds fun?</label>
+              <div class="chips">
+                <label class="chip"><input type="checkbox" name="interest" value="outdoors" checked><span>🌳 Outdoors</span></label>
+                <label class="chip"><input type="checkbox" name="interest" value="water" checked><span>💦 Water play</span></label>
+                <label class="chip"><input type="checkbox" name="interest" value="learning" checked><span>🧠 Learning</span></label>
+                <label class="chip"><input type="checkbox" name="interest" value="animals"><span>🦁 Animals</span></label>
+                <label class="chip"><input type="checkbox" name="interest" value="active" checked><span>🏃 Active</span></label>
+                <label class="chip"><input type="checkbox" name="interest" value="treats" checked><span>🍦 Treats</span></label>
+              </div>
+            </div>
+          </div>
+          <button class="primary" id="generateBtn" type="submit">Build my family day</button>
+          <div class="privacy"><span>🔒</span><span>No account required. Plans stay in this browser unless you share them.</span></div>
+        </form>
+        <div class="status" id="status" role="status"></div>
+      </div>
+
+      <aside class="card sample-card">
+        <h3>What the plan looks like</h3>
+        <p class="card-sub">Real places are selected after you generate.</p>
+        <div class="sample">
+          <div class="sample-row"><div class="time">9:00–10:15</div><div><strong>Outdoor first stop</strong><small>Use the coolest part of the day for active play.</small></div></div>
+          <div class="sample-row"><div class="time">10:30–11:30</div><div><strong>Lower-key second stop</strong><small>Library, museum, market, or hands-on learning.</small></div></div>
+          <div class="sample-row"><div class="time">11:45–12:30</div><div><strong>Snack or lunch break</strong><small>A nearby treat or easy meal with minimal backtracking.</small></div></div>
+        </div>
+        <div class="trust">
+          <div><strong>Live weather</strong><span>Open-Meteo</span></div>
+          <div><strong>Nearby places</strong><span>OpenStreetMap</span></div>
+          <div><strong>No API key</strong><span>Free MVP</span></div>
+        </div>
+        <a class="live-link" id="eventsLink" href="#" target="_blank" rel="noopener">Search live family events for your date ↗</a>
+      </aside>
+    </section>
+
+    <section class="results" id="results">
+      <div class="result-head">
+        <div><h2 id="planTitle">Your family day</h2><p id="planSubtitle"></p></div>
+        <div class="actions">
+          <button class="secondary" id="saveBtn">Save</button>
+          <button class="secondary" id="shareBtn">Share</button>
+          <button class="secondary" id="copyBtn">Copy</button>
+        </div>
+      </div>
+      <div class="weather" id="weather"></div>
+      <div class="timeline" id="timeline"></div>
+    </section>
+
+    <section class="card saved">
+      <h3>Saved plans</h3>
+      <p class="card-sub">Stored only on this device.</p>
+      <div class="saved-list" id="savedList"></div>
+    </section>
+
+    <footer>
+      Nearby-place data can be incomplete or outdated. Confirm hours, admission, accessibility, and age rules before leaving. This planner is not affiliated with The Good Hours.
+    </footer>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $("plannerForm");
+    const results = $("results");
+    const timeline = $("timeline");
+    const statusBox = $("status");
+    const generateBtn = $("generateBtn");
+    let currentPlan = null;
+    let deferredPrompt = null;
+    let gpsCoords = null;
+
+    const fallbackPlaces = [
+      {name:"Nearby playground or neighborhood park",category:"playground",cost:"Free",indoor:false,duration:75,interests:["outdoors","active"],generic:true},
+      {name:"Local public library children's area",category:"library",cost:"Free",indoor:true,duration:60,interests:["learning"],generic:true},
+      {name:"Splash pad or public pool",category:"water",cost:"Free / low-cost",indoor:false,duration:80,interests:["water","active"],generic:true},
+      {name:"Family museum or discovery center",category:"museum",cost:"Paid",indoor:true,duration:90,interests:["learning"],generic:true},
+      {name:"Ice cream or snack stop",category:"treat",cost:"Spending optional",indoor:true,duration:35,interests:["treats"],generic:true}
+    ];
+
+    function nextSaturday(){
+      const d = new Date();
+      const add = (6 - d.getDay() + 7) % 7 || 7;
+      d.setDate(d.getDate() + add);
+      return d.toISOString().slice(0,10);
+    }
+    $("date").value = nextSaturday();
+
+    function setStatus(message, loading=false){
+      statusBox.classList.toggle("show", !!message);
+      statusBox.innerHTML = message ? (loading ? '<span class="spinner"></span>' : '') + message : "";
+    }
+
+    function parseAges(value){
+      const ages = value.split(/[^0-9]+/).map(Number).filter(n => Number.isFinite(n) && n >= 0 && n <= 18);
+      return ages.length ? ages : [5,10];
+    }
+
+    function checkedInterests(){
+      return [...document.querySelectorAll('input[name="interest"]:checked')].map(x => x.value);
+    }
+
+    function eventSearchUrl(location, date){
+      const q = `family events kids ${location} ${date}`;
+      return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    }
+
+    function updateEventsLink(){
+      $("eventsLink").href = eventSearchUrl($("location").value.trim() || "near me", $("date").value);
+    }
+    ["location","date"].forEach(id => $(id).addEventListener("input", updateEventsLink));
+    updateEventsLink();
+
+    $("locateBtn").addEventListener("click", () => {
+      if (!navigator.geolocation) return setStatus("This browser does not support GPS location.");
+      setStatus("Getting your location…", true);
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          gpsCoords = {lat:pos.coords.latitude, lon:pos.coords.longitude, label:"Current location"};
+          $("location").value = "Current location";
+          updateEventsLink();
+          setStatus("GPS location ready.");
+        },
+        () => setStatus("Location permission was not available. Enter a city or ZIP code instead."),
+        {enableHighAccuracy:true,timeout:10000,maximumAge:300000}
+      );
+    });
+
+    async function geocode(query){
+      if (gpsCoords && query.toLowerCase().includes("current")) return gpsCoords;
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en&format=json`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Location search failed");
+      const data = await res.json();
+      const best = data.results?.[0];
+      if (!best) throw new Error("Location not found");
+      return {lat:best.latitude,lon:best.longitude,label:[best.name,best.admin1,best.country_code].filter(Boolean).join(", ")};
+    }
+
+    function weatherEmoji(code){
+      if (code === 0) return "☀️";
+      if ([1,2].includes(code)) return "🌤️";
+      if (code === 3) return "☁️";
+      if ([45,48].includes(code)) return "🌫️";
+      if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return "🌧️";
+      if ([71,73,75,77,85,86].includes(code)) return "❄️";
+      if ([95,96,99].includes(code)) return "⛈️";
+      return "🌤️";
+    }
+
+    async function getWeather(coords, date){
+      const daysAway = Math.round((new Date(date+"T12:00:00") - new Date()) / 86400000);
+      if (daysAway < 0 || daysAway > 16) return null;
+      const url = new URL("https://api.open-meteo.com/v1/forecast");
+      url.search = new URLSearchParams({
+        latitude:coords.lat,longitude:coords.lon,
+        daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+        temperature_unit:"fahrenheit",timezone:"auto",start_date:date,end_date:date
+      });
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const d = (await res.json()).daily;
+      if (!d?.time?.length) return null;
+      return {code:d.weather_code[0],high:Math.round(d.temperature_2m_max[0]),low:Math.round(d.temperature_2m_min[0]),rain:Math.round(d.precipitation_probability_max[0] || 0)};
+    }
+
+    function haversine(a,b){
+      const R=3958.8, rad=x=>x*Math.PI/180;
+      const dLat=rad(b.lat-a.lat), dLon=rad(b.lon-a.lon);
+      const s=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+      return 2*R*Math.asin(Math.sqrt(s));
+    }
+
+    function classify(tags={}){
+      const leisure=tags.leisure, amenity=tags.amenity, tourism=tags.tourism, shop=tags.shop, sport=tags.sport;
+      if (leisure==="playground") return {category:"playground",cost:"Free",indoor:false,duration:75,interests:["outdoors","active"]};
+      if (leisure==="park" || tags.natural==="beach") return {category:"park",cost:"Free",indoor:false,duration:75,interests:["outdoors","active"]};
+      if (["water_park","swimming_pool"].includes(leisure)) return {category:"water",cost:leisure==="water_park"?"Paid":"Free / low-cost",indoor:false,duration:90,interests:["water","active"]};
+      if (amenity==="library") return {category:"library",cost:"Free",indoor:true,duration:60,interests:["learning"]};
+      if (tourism==="museum" || amenity==="arts_centre") return {category:"museum",cost:"Free / paid",indoor:true,duration:90,interests:["learning"]};
+      if (["zoo","aquarium"].includes(tourism)) return {category:"animals",cost:"Paid",indoor:tourism==="aquarium",duration:120,interests:["animals","learning"]};
+      if (["theme_park","attraction"].includes(tourism)) return {category:"attraction",cost:"Paid",indoor:false,duration:120,interests:["active"]};
+      if (amenity==="cinema") return {category:"cinema",cost:"Paid",indoor:true,duration:120,interests:["learning"]};
+      if (sport==="bowling" || (leisure==="sports_centre" && /bowl/i.test(tags.name||""))) return {category:"active-indoor",cost:"Paid",indoor:true,duration:90,interests:["active"]};
+      if (["ice_cream","cafe","fast_food"].includes(amenity) || ["ice_cream","books","toys"].includes(shop)) {
+        return {category:"treat",cost:"Spending optional",indoor:true,duration:40,interests:["treats"]};
+      }
+      return {category:"other",cost:"Varies",indoor:false,duration:60,interests:["outdoors"]};
+    }
+
+    function addressFrom(tags={}){
+      const line = [tags["addr:housenumber"],tags["addr:street"]].filter(Boolean).join(" ");
+      return [line,tags["addr:city"]].filter(Boolean).join(", ");
+    }
+
+    async function getPlaces(coords){
+      const radius=14000;
+      const query=`[out:json][timeout:24];
+      (
+        nwr(around:${radius},${coords.lat},${coords.lon})["leisure"~"playground|park|water_park|sports_centre|swimming_pool"];
+        nwr(around:${radius},${coords.lat},${coords.lon})["amenity"~"library|community_centre|cinema|arts_centre|ice_cream|cafe|fast_food"];
+        nwr(around:${radius},${coords.lat},${coords.lon})["tourism"~"museum|zoo|aquarium|theme_park|attraction"];
+        nwr(around:${radius},${coords.lat},${coords.lon})["shop"~"books|toys|ice_cream"];
+      );
+      out center tags 180;`;
+      const endpoints=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"];
+      let lastError;
+      for (const endpoint of endpoints){
+        try{
+          const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:"data="+encodeURIComponent(query)});
+          if(!res.ok) throw new Error("Nearby place search failed");
+          const data=await res.json();
+          const seen=new Set();
+          return (data.elements||[]).map(el=>{
+            const tags=el.tags||{}, lat=el.lat??el.center?.lat, lon=el.lon??el.center?.lon;
+            const name=tags.name;
+            if(!name || !lat || !lon) return null;
+            const key=(name+"|"+lat.toFixed(3)+"|"+lon.toFixed(3)).toLowerCase();
+            if(seen.has(key)) return null; seen.add(key);
+            const c=classify(tags);
+            return {...c,name,lat,lon,distance:haversine(coords,{lat,lon}),address:addressFrom(tags),
+              website:tags.website||tags["contact:website"]||"",opening:tags.opening_hours||"",tags};
+          }).filter(Boolean).sort((a,b)=>a.distance-b.distance).slice(0,150);
+        }catch(e){lastError=e}
+      }
+      throw lastError || new Error("Nearby place search failed");
+    }
+
+    function isHot(weather){ return weather && weather.high >= 88; }
+    function isWet(weather){ return weather && (weather.rain >= 45 || [61,63,65,80,81,82,95,96,99].includes(weather.code)); }
+
+    function scorePlace(place, prefs, weather){
+      let score=80-Math.min(place.distance||0,20)*2.4;
+      const matched=place.interests.filter(i=>prefs.interests.includes(i)).length;
+      score += matched*25;
+      if(prefs.budget==="free"){
+        if(place.cost==="Free") score+=34; else if(/paid/i.test(place.cost)) score-=90; else score-=18;
+      }else if(prefs.budget==="low"){
+        if(place.cost==="Free") score+=20; else if(place.cost==="Paid") score-=18;
+      }
+      if(prefs.energy==="easy"){
+        if(["library","museum","treat","cinema"].includes(place.category)) score+=22;
+        if(["water","attraction","animals"].includes(place.category)) score-=9;
+      }
+      if(prefs.energy==="active" && ["playground","park","water","active-indoor","attraction"].includes(place.category)) score+=24;
+      if(isWet(weather)){ score += place.indoor ? 38 : -55; }
+      if(isHot(weather)){
+        if(place.category==="water" || place.indoor) score+=32;
+        if(["park","playground"].includes(place.category)) score-=10;
+      }
+      if(place.category==="other") score-=22;
+      return score;
+    }
+
+    function ageReason(ages, place){
+      const youngest=Math.min(...ages), oldest=Math.max(...ages);
+      if(place.category==="playground") return youngest<=7 ? "Good fit for the younger child, with room for the older one to move." : "A straightforward active stop for the whole group.";
+      if(place.category==="library") return "A calm reset with options across different reading and attention levels.";
+      if(place.category==="water") return "High-energy play that works well for mixed ages; confirm swim and supervision rules.";
+      if(place.category==="museum") return "A hands-on or curiosity-driven stop that gives both ages something to explore.";
+      if(place.category==="animals") return "Animals usually hold attention across a wide age range.";
+      if(place.category==="treat") return "A short reward break that keeps the day moving without overplanning.";
+      if(oldest-youngest>=4) return "Selected as a mixed-age option with enough flexibility for both kids.";
+      return "Selected for the kids' ages, your interests, and the pace you requested.";
+    }
+
+    function weatherReason(place, weather){
+      if(!weather) return "";
+      if(isWet(weather)) return place.indoor ? " Indoor choice because rain is possible." : " Keep a nearby indoor backup because rain is possible.";
+      if(isHot(weather)){
+        if(place.category==="water") return " Water play fits the hot forecast.";
+        if(place.indoor) return " Air-conditioned break from the heat.";
+        return " Go early, bring water, and use shade.";
+      }
+      return place.indoor ? " Useful as a low-stimulation reset." : " The forecast supports an outdoor stop.";
+    }
+
+    function choosePlaces(places,prefs,weather){
+      const scored=places.map(p=>({...p,score:scorePlace(p,prefs,weather)})).sort((a,b)=>b.score-a.score);
+      const target=prefs.hours>=7?4:prefs.hours>=4?3:2;
+      const chosen=[], usedCategories=new Set();
+      const activityPool=scored.filter(p=>p.category!=="treat");
+      for(const p of activityPool){
+        const broad = ["playground","park"].includes(p.category) ? "outdoor" : p.category;
+        if(usedCategories.has(broad) && chosen.length<target-1) continue;
+        chosen.push(p); usedCategories.add(broad);
+        if(chosen.length>=target) break;
+      }
+      if(prefs.interests.includes("treats") && prefs.hours>=4){
+        const treat=scored.find(p=>p.category==="treat");
+        if(treat) chosen.splice(Math.min(2,chosen.length),0,treat);
+      }
+      return chosen.slice(0,prefs.hours>=7?5:4);
+    }
+
+    function fallbackSelection(prefs,weather){
+      return fallbackPlaces
+        .filter(p=>prefs.budget!=="free" || !/Paid/.test(p.cost))
+        .map((p,i)=>({...p,score:scorePlace({...p,distance:2+i},prefs,weather),distance:null}))
+        .sort((a,b)=>b.score-a.score)
+        .slice(0,prefs.hours>=7?4:3);
+    }
+
+    function minutesToTime(total){
+      total=(total+1440)%1440;
+      const h=Math.floor(total/60), m=total%60, suffix=h>=12?"PM":"AM";
+      return `${h%12||12}:${String(m).padStart(2,"0")} ${suffix}`;
+    }
+
+    function buildSchedule(chosen,prefs,weather){
+      const [h,m]=prefs.startTime.split(":").map(Number);
+      let cursor=h*60+m;
+      const end=cursor+prefs.hours*60;
+      const schedule=[];
+      for(let i=0;i<chosen.length;i++){
+        const p=chosen[i];
+        let duration=p.duration||60;
+        if(cursor+duration>end) duration=Math.max(35,end-cursor);
+        if(duration<30) break;
+        const start=cursor, finish=cursor+duration;
+        schedule.push({...p,start,finish,why:ageReason(prefs.ages,p)+weatherReason(p,weather)});
+        cursor=finish+15;
+        if(cursor>=end-20) break;
+      }
+      return schedule;
+    }
+
+    function mapUrl(p,location){
+      const q=p.lat&&p.lon?`${p.lat},${p.lon}`:`${p.name}, ${location}`;
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    }
+
+    function ticketUrl(p,location){
+      if(p.website) return p.website;
+      return `https://www.google.com/search?q=${encodeURIComponent(`${p.name} ${location} tickets hours`)}`;
+    }
+
+    function escapeHtml(value=""){
+      return String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch]));
+    }
+
+    function renderPlan(plan){
+      currentPlan=plan;
+      $("planTitle").textContent=`${plan.locationLabel} family day`;
+      $("planSubtitle").textContent=`${new Date(plan.date+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"})} • ${plan.hours} hours • ages ${plan.ages.join(" & ")}`;
+      if(plan.weather){
+        $("weather").innerHTML=`<div><strong>${weatherEmoji(plan.weather.code)} ${plan.weather.high}° / ${plan.weather.low}°</strong><small>${plan.weather.rain}% chance of precipitation • live forecast</small></div><div class="weather-icon">${weatherEmoji(plan.weather.code)}</div>`;
+      }else{
+        $("weather").innerHTML=`<div><strong>Forecast unavailable for this date</strong><small>The plan still uses your indoor/outdoor preferences.</small></div><div class="weather-icon">📅</div>`;
+      }
+      timeline.innerHTML=plan.schedule.map((p,i)=>{
+        const meta=[
+          p.cost,
+          p.distance!=null?`${p.distance.toFixed(1)} mi from starting area`:"",
+          p.address||"",
+          p.opening?`Hours listed: ${p.opening}`:""
+        ].filter(Boolean).join(" • ");
+        return `<article class="stop">
+          <div class="stop-time">${minutesToTime(p.start)}<br>– ${minutesToTime(p.finish)}</div>
+          <div class="stop-body">
+            <div class="stop-top"><h3>${escapeHtml(p.name)}</h3><span class="badge">${escapeHtml(p.cost)}</span></div>
+            <p class="meta">${escapeHtml(meta || "Confirm details before leaving")}</p>
+            <p class="why">${escapeHtml(p.why)}</p>
+            <div class="stop-links">
+              <a class="link-btn" href="${mapUrl(p,plan.locationLabel)}" target="_blank" rel="noopener">📍 Map</a>
+              <a class="link-btn" href="${ticketUrl(p,plan.locationLabel)}" target="_blank" rel="noopener">${p.website?"🌐 Website":"🎟️ Hours / tickets"}</a>
+              <label class="check"><input type="checkbox" data-stop="${i}"> Done</label>
+            </div>
+          </div>
+        </article>`;
+      }).join("");
+      results.classList.add("show");
+      results.scrollIntoView({behavior:"smooth",block:"start"});
+    }
+
+    function planText(plan){
+      const heading=`Family Day Builder — ${plan.locationLabel}\n${plan.date} • Ages ${plan.ages.join(", ")} • ${plan.hours} hours`;
+      const stops=plan.schedule.map(p=>`\n${minutesToTime(p.start)}–${minutesToTime(p.finish)}: ${p.name}\n${p.cost}${p.address?` • ${p.address}`:""}\n${p.why}`).join("\n");
+      return heading+stops+"\n\nConfirm hours, admission, and rules before leaving.";
+    }
+
+    form.addEventListener("submit", async e=>{
+      e.preventDefault();
+      generateBtn.disabled=true;
+      results.classList.remove("show");
+      setStatus("Finding your location and checking the forecast…",true);
+      const prefs={
+        ages:parseAges($("ages").value),
+        date:$("date").value,
+        location:$("location").value.trim(),
+        startTime:$("startTime").value,
+        hours:Number($("hours").value),
+        budget:$("budget").value,
+        energy:$("energy").value,
+        interests:checkedInterests()
+      };
+      if(!prefs.interests.length) prefs.interests=["outdoors","learning"];
+      try{
+        const coords=await geocode(prefs.location);
+        setStatus("Looking for nearby kid-friendly places…",true);
+        const weatherPromise=getWeather(coords,prefs.date);
+        let places=[], source="live";
+        try{ places=await getPlaces(coords); }
+        catch(err){ source="fallback"; }
+        const weather=await weatherPromise;
+        const chosen=places.length?choosePlaces(places,prefs,weather):fallbackSelection(prefs,weather);
+        const schedule=buildSchedule(chosen,prefs,weather);
+        if(!schedule.length) throw new Error("Not enough activities matched");
+        const plan={...prefs,locationLabel:coords.label,coords,weather,schedule,source,createdAt:Date.now()};
+        renderPlan(plan);
+        setStatus(source==="live" ? `Plan built from ${places.length} nearby place records.` : "Live place search was busy, so this plan uses practical backup categories. Map and search links will help you choose the exact venue.");
+      }catch(err){
+        console.error(err);
+        setStatus(`I couldn't build the plan yet: ${err.message}. Try a nearby city name instead of a ZIP code.`);
+      }finally{
+        generateBtn.disabled=false;
+      }
+    });
+
+    $("copyBtn").addEventListener("click",async()=>{
+      if(!currentPlan)return;
+      await navigator.clipboard.writeText(planText(currentPlan));
+      setStatus("Plan copied to your clipboard.");
+    });
+
+    $("shareBtn").addEventListener("click",async()=>{
+      if(!currentPlan)return;
+      const data={title:"Our family day",text:planText(currentPlan)};
+      if(navigator.share){ try{await navigator.share(data)}catch{} }
+      else{ await navigator.clipboard.writeText(data.text); setStatus("Sharing is not available here, so the plan was copied."); }
+    });
+
+    function getSaved(){
+      try{return JSON.parse(localStorage.getItem("familyDayPlans")||"[]")}catch{return []}
+    }
+    function setSaved(plans){localStorage.setItem("familyDayPlans",JSON.stringify(plans.slice(0,8)));renderSaved()}
+    $("saveBtn").addEventListener("click",()=>{
+      if(!currentPlan)return;
+      const plans=getSaved().filter(p=>p.createdAt!==currentPlan.createdAt);
+      plans.unshift(currentPlan);setSaved(plans);setStatus("Plan saved on this device.");
+    });
+    function renderSaved(){
+      const plans=getSaved(), box=$("savedList");
+      if(!plans.length){box.innerHTML='<div class="empty">No saved plans yet. Generate a day, then tap Save.</div>';return}
+      box.innerHTML=plans.map((p,i)=>`<div class="saved-item"><button class="secondary load-plan" data-index="${i}" style="text-align:left;flex:1"><strong>${escapeHtml(p.locationLabel)}</strong><small>${escapeHtml(p.date)} • ${p.hours} hours • ${p.schedule.length} stops</small></button><button class="delete" data-delete="${i}">Delete</button></div>`).join("");
+      box.querySelectorAll(".load-plan").forEach(btn=>btn.addEventListener("click",()=>renderPlan(getSaved()[Number(btn.dataset.index)])));
+      box.querySelectorAll(".delete").forEach(btn=>btn.addEventListener("click",()=>{const p=getSaved();p.splice(Number(btn.dataset.delete),1);setSaved(p)}));
+    }
+    renderSaved();
+
+    window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredPrompt=e;$("installBtn").hidden=false});
+    $("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$("installBtn").hidden=true});
+    if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+  </script>
+</body>
+</html>
