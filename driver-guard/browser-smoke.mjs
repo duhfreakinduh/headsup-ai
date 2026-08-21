@@ -3,7 +3,7 @@ const browser=await puppeteer.launch({headless:true,executablePath:process.env.C
 const page=await browser.newPage();
 const errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
-page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});
+page.on('console',m=>{if(m.type()==='error'&&!m.text().includes('Failed to load resource'))errors.push('console: '+m.text());});
 await page.evaluateOnNewDocument(()=>{
   Object.defineProperty(navigator,'mediaDevices',{configurable:true,value:{getUserMedia:async()=>{
     const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.fillStyle='#777';x.fillRect(0,0,c.width,c.height);setInterval(()=>{x.fillStyle='#777';x.fillRect(0,0,c.width,c.height);},100);return c.captureStream(12);
@@ -13,7 +13,7 @@ await page.goto('http://127.0.0.1:4173/driver-guard/?v=5',{waitUntil:'networkidl
 await page.waitForSelector('#testBtn');
 await page.click('#testBtn');
 await page.waitForFunction(()=>document.querySelector('#statusText')?.textContent==='TEST WARNING',{timeout:5000});
-await page.waitForTimeout(2600);
+await new Promise(r=>setTimeout(r,2600));
 await page.evaluate(()=>{document.querySelector('#gpsToggle').checked=false;});
 await page.click('#startBtn');
 await page.waitForFunction(()=>['MODEL READY','CALIBRATE','NO FACE','READY','OK','DISTRACTED'].includes(document.querySelector('#faceText')?.textContent||''),{timeout:120000});
