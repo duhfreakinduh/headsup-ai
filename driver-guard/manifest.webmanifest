@@ -1,0 +1,11 @@
+{
+  "name":"Driver Guard AI",
+  "short_name":"Driver Guard",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#040912",
+  "theme_color":"#07111f",
+  "description":"On-device AI distraction warning prototype for a mounted phone.",
+  "icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
