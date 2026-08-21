@@ -1,22 +1,25 @@
-name: Driver Guard v4 Test
+name: Driver Guard Tests
 
 on:
   push:
-    branches: ["fix/driver-guard-v4-tested"]
+    branches: ["main", "fix/driver-guard-v4-tested"]
+    paths:
+      - "driver-guard/**"
+      - ".github/workflows/driver-guard-v4-test.yml"
+  pull_request:
+    paths:
+      - "driver-guard/**"
+      - ".github/workflows/driver-guard-v4-test.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  test-and-patch:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: fix/driver-guard-v4-tested
-      - name: Patch v4 build
-        run: python driver-guard/ci-patch-v4.py
       - name: Syntax checks
         run: |
           node --check driver-guard/app.js
@@ -43,19 +46,9 @@ jobs:
             if (buf.byteLength < minBytes) throw new Error(`${name} response too small: ${buf.byteLength}`);
           }
           NODE
-      - name: Verify broken version is gone
+      - name: Verify fixed runtime and v4 core
         run: |
           ! grep -R "tasks-vision@0.10.22" driver-guard/app.js
           grep -q "tasks-vision@0.10.21" driver-guard/app.js
           grep -q "detection-core.js?v=4" driver-guard/app.js
-      - name: Commit tested patch
-        run: |
-          if git diff --quiet -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js; then
-            echo "No patch changes needed"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js
-          git commit -m "Fix Driver Guard v4 detection [skip ci]"
-          git push origin HEAD:fix/driver-guard-v4-tested
+          grep -q "driver-guard-v4" driver-guard/sw.js
