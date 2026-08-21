@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
       - name: Patch v5 lazy loading
-        if: github.ref_name == 'fix/driver-guard-v4-tested'
+        if: github.event_name != 'push' || github.ref_name != 'main'
         run: python driver-guard/ci-patch-v5.py
       - name: Syntax checks
         run: |
@@ -69,7 +69,7 @@ jobs:
           sleep 2
           CHROME_PATH=/usr/bin/google-chrome node driver-guard/browser-smoke.mjs
       - name: Commit tested v5 patch
-        if: github.ref_name == 'fix/driver-guard-v4-tested'
+        if: github.event_name != 'push' || github.ref_name != 'main'
         run: |
           if git diff --quiet -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js; then
             echo "No patch changes needed"
@@ -79,4 +79,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add driver-guard/app.js driver-guard/index.html driver-guard/sw.js
           git commit -m "Fix Driver Guard v5 startup [skip ci]"
-          git push origin HEAD:fix/driver-guard-v4-tested
+          git push origin HEAD:${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
