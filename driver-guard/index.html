@@ -8,7 +8,9 @@
   <title>Driver Guard AI</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.6/dist/face-landmarks-detection.min.js"></script>
 </head>
@@ -16,27 +18,27 @@
   <main class="app">
     <header>
       <div>
-        <p class="eyebrow">ON-DEVICE DRIVER ASSIST</p>
+        <p class="eyebrow">ON-DEVICE DRIVER ASSIST + TRIP RECORDER</p>
         <h1>Driver Guard AI</h1>
       </div>
-      <span id="privacyBadge" class="badge">Camera stays local</span>
+      <span id="privacyBadge" class="badge">Camera + trip data stay local</span>
     </header>
 
     <section class="warning-card">
       <strong>Set this up while parked.</strong>
-      Mount the phone where the front camera can clearly see your face. Never hold, adjust, or troubleshoot the app while the vehicle is moving.
+      Mount the phone where the front camera can clearly see your face. Start the drive before moving and do not touch the app while the vehicle is in motion.
     </section>
 
     <section class="camera-card">
       <video id="video" playsinline muted></video>
       <canvas id="overlay"></canvas>
-      <div id="cameraMessage" class="camera-message">Tap Start while parked</div>
+      <div id="cameraMessage" class="camera-message">Tap Start drive while parked</div>
       <div id="alertBanner" class="alert-banner hidden">EYES ON THE ROAD</div>
     </section>
 
     <section class="status-grid">
       <article class="status-card main-status">
-        <span>STATUS</span>
+        <span>DRIVER STATUS</span>
         <strong id="statusText">READY</strong>
         <small id="reasonText">Monitoring is off</small>
       </article>
@@ -52,14 +54,71 @@
       </article>
     </section>
 
-    <section class="controls">
-      <button id="startBtn" class="primary">Start monitoring</button>
-      <button id="stopBtn" disabled>Stop</button>
+    <section class="controls primary-controls">
+      <button id="startBtn" class="primary">Start drive</button>
+      <button id="stopBtn" disabled>Stop + save drive</button>
       <button id="testBtn">Test warning + alarm</button>
     </section>
 
+    <section class="trip-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">LIVE TRIP MAP</p>
+          <h2>Drive tracker</h2>
+        </div>
+        <span id="gpsBadge" class="badge subtle">GPS waiting</span>
+      </div>
+
+      <div class="trip-stats">
+        <article><span>SPEED</span><strong id="speedText">0 mph</strong><small id="speedDetail">GPS speed</small></article>
+        <article><span>DISTANCE</span><strong id="distanceText">0.00 mi</strong><small>Recorded route</small></article>
+        <article><span>DURATION</span><strong id="durationText">00:00</strong><small>Drive time</small></article>
+        <article><span>MAP MARKS</span><strong id="triggerCount">0</strong><small>Triggers + warnings + alarms</small></article>
+      </div>
+
+      <div id="tripMap" class="trip-map" aria-label="Drive route and trigger map"></div>
+
+      <div class="map-toolbar">
+        <label class="check compact"><input id="followToggle" type="checkbox" checked /> Follow my location</label>
+        <button id="recenterBtn" type="button" disabled>Recenter</button>
+        <button id="fitRouteBtn" type="button" disabled>Fit whole route</button>
+      </div>
+
+      <div class="map-legend" aria-label="Map legend">
+        <span><i class="dot route"></i> Route</span>
+        <span><i class="dot trigger"></i> Trigger</span>
+        <span><i class="dot warning"></i> Warning</span>
+        <span><i class="dot alarm"></i> Alarm</span>
+        <span><i class="dot recovery"></i> Recovered</span>
+      </div>
+
+      <div class="event-header">
+        <h3>Drive event log</h3>
+        <span id="eventSummary">No events yet</span>
+      </div>
+      <ol id="eventList" class="event-list" aria-live="polite">
+        <li class="empty-event">Start a drive to begin recording.</li>
+      </ol>
+
+      <div class="export-row">
+        <button id="exportJsonBtn" type="button" disabled>Export JSON</button>
+        <button id="exportGpxBtn" type="button" disabled>Export GPX</button>
+      </div>
+    </section>
+
+    <details class="history-panel">
+      <summary>Recent saved drives</summary>
+      <div class="history-controls">
+        <label for="tripHistory">Saved on this device</label>
+        <select id="tripHistory"><option value="">No saved drives yet</option></select>
+        <button id="loadTripBtn" type="button" disabled>Load selected drive on map</button>
+        <button id="deleteTripBtn" type="button" class="danger-lite" disabled>Delete selected drive</button>
+      </div>
+      <p class="small-note">Saved drives are stored in this browser on this device. Clearing browser/site data can remove them.</p>
+    </details>
+
     <details class="settings">
-      <summary>Detection settings</summary>
+      <summary>Detection + tracking settings</summary>
       <label>Spoken warning after <output id="warnOut">1.5 s</output>
         <input id="warnDelay" type="range" min="0.8" max="3" step="0.1" value="1.5" />
       </label>
@@ -67,15 +126,16 @@
         <input id="alarmDelay" type="range" min="2" max="7" step="0.5" value="3" />
       </label>
       <label class="check"><input id="phoneToggle" type="checkbox" checked /> Detect a visible cell phone with Hugging Face AI</label>
-      <p>Phone detection uses <code>Xenova/yolos-tiny</code> through Transformers.js. The first load downloads model files; later loads use browser cache.</p>
+      <label class="check"><input id="gpsToggle" type="checkbox" checked /> Track GPS route, speed, distance and trigger locations</label>
+      <p>Phone detection uses <code>Xenova/yolos-tiny</code> through Transformers.js. GPS uses your phone's browser location permission. Camera frames are processed on the device and are not saved by this app.</p>
     </details>
 
     <section class="how">
-      <h2>What counts as a distraction?</h2>
-      <p>Head turned away, looking down/up beyond your calibrated forward pose, prolonged eye closure, your face leaving the camera, or a visible cell phone. A short distraction triggers a voice warning; continuing triggers a repeating siren and vibration.</p>
+      <h2>What gets recorded?</h2>
+      <p>The route, timestamps, available GPS speed/heading/accuracy, total distance, drive duration, distraction starts, trigger changes, visible-phone detections, spoken warnings, alarms, recoveries and the location of each event when GPS is available.</p>
     </section>
 
-    <footer>Experimental driver-assistance prototype — not a certified safety system and not a substitute for attentive driving.</footer>
+    <footer>Experimental driver-assistance prototype — not a certified safety system and not a substitute for attentive driving. Browser backgrounding, battery restrictions, GPS reception and permissions can interrupt tracking.</footer>
   </main>
 
   <canvas id="snapshot" width="320" height="240" hidden></canvas>
