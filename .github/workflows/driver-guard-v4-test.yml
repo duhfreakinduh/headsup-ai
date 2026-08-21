@@ -13,13 +13,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Patch v5 lazy loading
+        if: github.ref_name == 'fix/driver-guard-v4-tested'
+        run: python driver-guard/ci-patch-v5.py
       - name: Syntax checks
         run: |
           node --check driver-guard/app.js
@@ -46,9 +51,32 @@ jobs:
             if (buf.byteLength < minBytes) throw new Error(`${name} response too small: ${buf.byteLength}`);
           }
           NODE
-      - name: Verify fixed runtime and v4 core
+      - name: Verify v5 no external static imports
         run: |
-          ! grep -R "tasks-vision@0.10.22" driver-guard/app.js
-          grep -q "tasks-vision@0.10.21" driver-guard/app.js
-          grep -q "detection-core.js?v=4" driver-guard/app.js
-          grep -q "driver-guard-v4" driver-guard/sw.js
+          grep -q "detection-core.js?v=5" driver-guard/app.js
+          grep -q "await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm')" driver-guard/app.js
+          grep -q "await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1')" driver-guard/app.js
+          ! grep -q "^import { pipeline" driver-guard/app.js
+          ! grep -q "^import { FaceLandmarker" driver-guard/app.js
+          grep -q "driver-guard-v5" driver-guard/sw.js
+      - name: Install browser test dependency
+        run: npm install --no-save puppeteer-core@24.16.0
+      - name: Browser startup smoke test
+        run: |
+          python3 -m http.server 4173 --directory . >/tmp/driver-guard-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 2
+          CHROME_PATH=/usr/bin/google-chrome node driver-guard/browser-smoke.mjs
+      - name: Commit tested v5 patch
+        if: github.ref_name == 'fix/driver-guard-v4-tested'
+        run: |
+          if git diff --quiet -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add driver-guard/app.js driver-guard/index.html driver-guard/sw.js
+          git commit -m "Fix Driver Guard v5 startup [skip ci]"
+          git push origin HEAD:fix/driver-guard-v4-tested
