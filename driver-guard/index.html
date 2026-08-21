@@ -9,14 +9,14 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=6" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
   <main class="app">
     <header>
       <div>
-        <p class="eyebrow">HUGGING FACE AI • DRIVER ASSIST + TRIP RECORDER</p>
+        <p class="eyebrow">HUGGING FACE AI • FAST SAFETY MODE • TRIP RECORDER</p>
         <h1>Driver Guard AI</h1>
       </div>
       <span id="privacyBadge" class="badge">Camera + trip data stay local</span>
@@ -48,7 +48,7 @@
       <article class="status-card">
         <span>HF PHONE AI</span>
         <strong id="phoneText">—</strong>
-        <small id="phoneDetail">HF YOLOS loads after Start</small>
+        <small id="phoneDetail">HF YOLOS loads after face monitoring starts</small>
       </article>
     </section>
 
@@ -117,26 +117,27 @@
 
     <details class="settings" open>
       <summary>Detection + tracking settings</summary>
-      <label>Spoken warning after <output id="warnOut">0.8 s</output>
+      <label>General spoken warning after <output id="warnOut">0.8 s</output>
         <input id="warnDelay" type="range" min="0.5" max="3" step="0.1" value="0.8" />
       </label>
-      <label>Alarm after <output id="alarmOut">2.0 s</output>
+      <label>General alarm after <output id="alarmOut">2.0 s</output>
         <input id="alarmDelay" type="range" min="1.5" max="7" step="0.5" value="2" />
       </label>
       <label class="check"><input id="phoneToggle" type="checkbox" checked /> Detect a visible cell phone with Hugging Face AI</label>
       <label class="check"><input id="gpsToggle" type="checkbox" checked /> Track GPS route, speed, distance and trigger locations</label>
-      <p><strong>AI models:</strong> face/eye/head landmarks are loaded from Hugging Face using <code>face_landmarker.task</code>; phone detection uses <code>Xenova/yolos-tiny</code> through Hugging Face Transformers.js. Live face status shows blink %, yaw change and pitch change so you can verify detection while parked.</p>
+      <p><strong>v6 behavior:</strong> eyes-closed alerts are intentionally faster than the general sliders. The face detector reacts immediately on-screen, uses accumulated evidence so a single missed frame does not reset everything, and slowly adapts its forward-pose baseline while you are attentive.</p>
+      <p><strong>AI models:</strong> face/eye/head landmarks are loaded from Hugging Face using <code>face_landmarker.task</code>; phone detection uses <code>Xenova/yolos-tiny</code> through Hugging Face Transformers.js.</p>
     </details>
 
     <section class="how">
       <h2>What should trigger?</h2>
-      <p>Eyes closed for about half a second, head turned away, looking significantly up/down, your face leaving the camera, or a visible phone. Normal quick blinks are filtered out. A trigger first gives a spoken warning, then a loud repeating alarm if it continues. Every trigger is logged and pinned to the map when GPS is available.</p>
+      <p>Sustained closed eyes, head turned away, looking significantly up/down, your face leaving the camera, or a visible phone. Normal quick blinks are filtered. The live status now shows eye/turn evidence before the full trigger fires, then gives a spoken warning and a repeating alarm if the condition continues. Every trigger is logged and pinned to the map when GPS is available.</p>
     </section>
 
     <footer>Experimental driver-assistance prototype — not a certified safety system and not a substitute for attentive driving. Test detection while parked before relying on it.</footer>
   </main>
 
-  <canvas id="snapshot" width="320" height="240" hidden></canvas>
-  <script type="module" src="./app.js?v=4"></script>
+  <canvas id="snapshot" width="224" height="168" hidden></canvas>
+  <script type="module" src="./app-v6.js?v=6"></script>
 </body>
 </html>
