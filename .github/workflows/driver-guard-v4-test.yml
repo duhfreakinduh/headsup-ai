@@ -1,0 +1,61 @@
+name: Driver Guard v4 Test
+
+on:
+  push:
+    branches: ["fix/driver-guard-v4-tested"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/driver-guard-v4-tested
+      - name: Patch v4 build
+        run: python driver-guard/ci-patch-v4.py
+      - name: Syntax checks
+        run: |
+          node --check driver-guard/app.js
+          node --check driver-guard/detection-core.js
+          node --check driver-guard/sw.js
+      - name: Detection engine tests
+        run: node --test driver-guard/detection-core.test.mjs
+      - name: External AI dependency probes
+        shell: bash
+        run: |
+          node <<'NODE'
+          const checks = [
+            ['MediaPipe ESM','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm',1000],
+            ['MediaPipe WASM','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm/vision_wasm_internal.wasm',100000],
+            ['HF face model','https://huggingface.co/abiral1011/skin_detect/resolve/main/face_landmarker.task',3000000],
+            ['HF YOLOS config','https://huggingface.co/Xenova/yolos-tiny/resolve/main/config.json',100],
+            ['Transformers.js','https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1',1000],
+          ];
+          for (const [name,url,minBytes] of checks) {
+            const r = await fetch(url,{redirect:'follow'});
+            if (!r.ok) throw new Error(`${name} returned ${r.status}`);
+            const buf = await r.arrayBuffer();
+            console.log(`${name}: ${r.status}, ${buf.byteLength} bytes`);
+            if (buf.byteLength < minBytes) throw new Error(`${name} response too small: ${buf.byteLength}`);
+          }
+          NODE
+      - name: Verify broken version is gone
+        run: |
+          ! grep -R "tasks-vision@0.10.22" driver-guard/app.js
+          grep -q "tasks-vision@0.10.21" driver-guard/app.js
+          grep -q "detection-core.js?v=4" driver-guard/app.js
+      - name: Commit tested patch
+        run: |
+          if git diff --quiet -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- driver-guard/app.js driver-guard/index.html driver-guard/sw.js
+          git commit -m "Fix Driver Guard v4 detection [skip ci]"
+          git push origin HEAD:fix/driver-guard-v4-tested
