@@ -1,0 +1,54 @@
+name: Driver Guard Tests
+
+on:
+  push:
+    branches: ["main", "fix/driver-guard-v4-tested"]
+    paths:
+      - "driver-guard/**"
+      - ".github/workflows/driver-guard-v4-test.yml"
+  pull_request:
+    paths:
+      - "driver-guard/**"
+      - ".github/workflows/driver-guard-v4-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Syntax checks
+        run: |
+          node --check driver-guard/app.js
+          node --check driver-guard/detection-core.js
+          node --check driver-guard/sw.js
+      - name: Detection engine tests
+        run: node --test driver-guard/detection-core.test.mjs
+      - name: External AI dependency probes
+        shell: bash
+        run: |
+          node <<'NODE'
+          const checks = [
+            ['MediaPipe ESM','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm',1000],
+            ['MediaPipe WASM','https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm/vision_wasm_internal.wasm',100000],
+            ['HF face model','https://huggingface.co/abiral1011/skin_detect/resolve/main/face_landmarker.task',3000000],
+            ['HF YOLOS config','https://huggingface.co/Xenova/yolos-tiny/resolve/main/config.json',100],
+            ['Transformers.js','https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1',1000],
+          ];
+          for (const [name,url,minBytes] of checks) {
+            const r = await fetch(url,{redirect:'follow'});
+            if (!r.ok) throw new Error(`${name} returned ${r.status}`);
+            const buf = await r.arrayBuffer();
+            console.log(`${name}: ${r.status}, ${buf.byteLength} bytes`);
+            if (buf.byteLength < minBytes) throw new Error(`${name} response too small: ${buf.byteLength}`);
+          }
+          NODE
+      - name: Verify fixed runtime and v4 core
+        run: |
+          ! grep -R "tasks-vision@0.10.22" driver-guard/app.js
+          grep -q "tasks-vision@0.10.21" driver-guard/app.js
+          grep -q "detection-core.js?v=4" driver-guard/app.js
+          grep -q "driver-guard-v4" driver-guard/sw.js
