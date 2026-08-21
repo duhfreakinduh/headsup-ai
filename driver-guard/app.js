@@ -1,5 +1,6 @@
 import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
-import { FaceLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm';
+import { FaceLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm';
+import { landmarkSignals, blendshapeBlink, createAttentionState, resetAttentionState, evaluateAttention } from './detection-core.js?v=4';
 
 env.allowLocalModels = false;
 env.useBrowserCache = true;
@@ -45,9 +46,7 @@ let lastReasonChangeAt = 0;
 
 let calibration = [];
 let baseline = null;
-let eyesClosedSince = null;
-let awaySince = null;
-let faceMissingSince = null;
+let attentionState = createAttentionState();
 
 let map = null;
 let routeLine = null;
@@ -68,11 +67,6 @@ const PHONE_INTERVAL_MS = 2300;
 const PHONE_HOLD_MS = 2700;
 const RESET_GOOD_MS = 450;
 
-const EYE_DWELL_MS = 420;
-const AWAY_DWELL_MS = 500;
-const MISSING_DWELL_MS = 700;
-const YAW_DELTA_LIMIT = 0.10;
-const PITCH_DELTA_LIMIT = 0.14;
 
 const EARTH_M = 6371000;
 const DB_NAME = 'DriverGuardAI';
@@ -86,32 +80,6 @@ const mph = (mps) => Number.isFinite(mps) ? mps * 2.236936 : 0;
 const miles = (meters) => meters / 1609.344;
 const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
 const nowIso = () => new Date().toISOString();
-
-function landmarkMetrics(k) {
-  if (!k || k.length < 292) return null;
-  const leftOuter = k[33], rightOuter = k[263], nose = k[1];
-  const mouthMid = mid(k[61], k[291]);
-  const eyeMid = mid(leftOuter, rightOuter);
-  const eyeSpan = Math.max(0.001, dist(leftOuter, rightOuter));
-  return {
-    yaw:(nose.x-eyeMid.x)/eyeSpan,
-    pitch:(nose.y-eyeMid.y)/Math.max(0.001, mouthMid.y-eyeMid.y)
-  };
-}
-
-function blendshapeMap(result) {
-  const cats = result?.faceBlendshapes?.[0]?.categories || [];
-  const m = Object.create(null);
-  for (const c of cats) m[c.categoryName || c.displayName] = Number(c.score) || 0;
-  return m;
-}
-
-function blinkScore(result) {
-  const m = blendshapeMap(result);
-  const left = m.eyeBlinkLeft ?? 0;
-  const right = m.eyeBlinkRight ?? 0;
-  return { left, right, avg:(left+right)/2 };
-}
 
 function setState(kind, status, reason) {
   document.body.classList.remove('state-good','state-warn','state-alarm');
@@ -471,7 +439,7 @@ async function setupFaceModel(){
   els.faceDetail.textContent='Downloading HF face model…';
 
   const vision=await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm'
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm'
   );
 
   const options={
@@ -529,7 +497,8 @@ function finishCalibration(){
   baseline={
     yaw:mean(calibration,'yaw'),
     pitch:mean(calibration,'pitch'),
-    blink:mean(calibration,'blink')
+    blink:mean(calibration,'blink'),
+    ear:mean(calibration,'ear')
   };
   monitoring=true;
   els.cameraMessage.classList.add('hidden');
@@ -541,11 +510,7 @@ function finishCalibration(){
 }
 
 function resetDwell(){
-  eyesClosedSince=null;awaySince=null;faceMissingSince=null;
-}
-
-function persistent(startValue, now, dwellMs){
-  return startValue!=null && now-startValue>=dwellMs;
+  resetAttentionState(attentionState);
 }
 
 async function faceStep(ts){
@@ -555,17 +520,17 @@ async function faceStep(ts){
     const result=faceLandmarker.detectForVideo(els.video,ts);
     const landmarks=result?.faceLandmarks?.[0];
     const hasFace=Boolean(landmarks?.length);
-    const blink=blinkScore(result);
-    const metrics=hasFace?landmarkMetrics(landmarks):null;
+    const blink=blendshapeBlink(result);
+    const signals=hasFace?landmarkSignals(landmarks):null;
 
     if(!monitoring){
-      if(hasFace&&metrics){
-        calibration.push({yaw:metrics.yaw,pitch:metrics.pitch,blink:blink.avg});
+      if(hasFace&&signals){
+        calibration.push({yaw:signals.yaw,pitch:signals.pitch,blink:blink.avg,ear:signals.ear});
         drawFace(landmarks,false);
         const elapsed=Math.min(CALIBRATION_MS,ts-(window.__calStart||ts));
         els.cameraMessage.textContent=`Look straight ahead with eyes open — calibrating ${Math.round(elapsed/CALIBRATION_MS*100)}%`;
         els.face.textContent='CALIBRATE';
-        els.faceDetail.textContent=`Blink ${Math.round(blink.avg*100)}%`;
+        els.faceDetail.textContent=`HF blink ${Math.round(blink.avg*100)}% · eye ratio ${signals.ear.toFixed(2)}`;
         if(elapsed>=CALIBRATION_MS)finishCalibration();
       }else{
         window.__calStart=ts;calibration=[];
@@ -576,42 +541,18 @@ async function faceStep(ts){
     }
 
     const now=performance.now();
-    const reasons=[];
+    const attention=evaluateAttention({hasFace,signals,blink,baseline,now,state:attentionState});
+    const reasons=[...attention.reasons];
+    const d=attention.diagnostics;
 
-    if(!hasFace||!metrics){
-      if(faceMissingSince==null)faceMissingSince=now;
-      eyesClosedSince=null;awaySince=null;
-      if(persistent(faceMissingSince,now,MISSING_DWELL_MS))reasons.push('face missing');
+    if(!hasFace||!signals){
       els.face.textContent='NO FACE';
-      els.faceDetail.textContent=`Missing ${Math.round(now-faceMissingSince)} ms`;
+      els.faceDetail.textContent=`HF model running · missing ${Math.round(d.missingForMs)} ms`;
       drawFace(null);
     }else{
-      faceMissingSince=null;
-
-      const yawDelta=Math.abs(metrics.yaw-baseline.yaw);
-      const pitchDelta=Math.abs(metrics.pitch-baseline.pitch);
-      const blinkThreshold=clamp(Math.max(0.42,baseline.blink+0.24),0.42,0.68);
-      const rawEyesClosed=blink.avg>=blinkThreshold || (blink.left>0.55&&blink.right>0.55);
-      const rawAway=yawDelta>YAW_DELTA_LIMIT || pitchDelta>PITCH_DELTA_LIMIT;
-
-      if(rawEyesClosed){
-        if(eyesClosedSince==null)eyesClosedSince=now;
-      }else eyesClosedSince=null;
-
-      if(rawAway){
-        if(awaySince==null)awaySince=now;
-      }else awaySince=null;
-
-      const eyesClosed=persistent(eyesClosedSince,now,EYE_DWELL_MS);
-      const lookingAway=persistent(awaySince,now,AWAY_DWELL_MS);
-
-      if(eyesClosed)reasons.push('eyes closed');
-      if(lookingAway)reasons.push(pitchDelta>PITCH_DELTA_LIMIT?'looking up/down':'head turned');
-
-      const danger=eyesClosed||lookingAway;
+      const danger=reasons.includes('eyes closed')||reasons.includes('head turned')||reasons.includes('looking up/down');
       els.face.textContent=danger?'DISTRACTED':'OK';
-      const eyePct=Math.round(blink.avg*100);
-      els.faceDetail.textContent=`HF blink ${eyePct}% · yaw Δ${yawDelta.toFixed(2)} · pitch Δ${pitchDelta.toFixed(2)}`;
+      els.faceDetail.textContent=`HF blink ${Math.round(d.blinkAvg*100)}% · eye ${d.ear.toFixed(2)} · yaw Δ${d.yawDelta.toFixed(2)} · pitch Δ${d.pitchDelta.toFixed(2)}`;
       drawFace(landmarks,danger);
     }
 
@@ -906,7 +847,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'&&running){requestWakeLock();map?.invalidateSize();}
 });
 
-if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=3').catch(()=>{});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=4').catch(()=>{});
 initMap();refreshHistory();
 setState('good','READY','Monitoring is off');
 els.faceDetail.textContent='HF face model waiting';
