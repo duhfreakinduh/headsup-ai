@@ -2,6 +2,9 @@ from pathlib import Path
 
 app=Path('driver-guard/app.js')
 s=app.read_text()
+if "./detection-core.js?v=5" in s and "let hfLib = null;" in s:
+    print('v5 already applied')
+    raise SystemExit(0)
 old="""import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';\nimport { FaceLandmarker, FilesetResolver } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/+esm';\nimport { landmarkSignals, blendshapeBlink, createAttentionState, resetAttentionState, evaluateAttention } from './detection-core.js?v=4';\n\nenv.allowLocalModels = false;\nenv.useBrowserCache = true;\n"""
 new="""import { landmarkSignals, blendshapeBlink, createAttentionState, resetAttentionState, evaluateAttention } from './detection-core.js?v=5';\n\nlet hfLib = null;\nlet mpLib = null;\n"""
 if old not in s: raise SystemExit('expected v4 imports not found')
