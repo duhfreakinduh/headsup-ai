@@ -43,7 +43,9 @@ data class FaceAnalysis(
 )
 
 class FaceAttentionEngine(context: Context) : AutoCloseable {
-    private val policy = AttentionPolicy()
+    private val appContext = context.applicationContext
+    private var config = AttentionConfig.fromContext(appContext)
+    private val policy = AttentionPolicy(config)
     private val faceLandmarker: FaceLandmarker
     private val calibration = ArrayDeque<Pair<Long, FaceMetrics>>()
     private var baseline: Baseline? = null
@@ -63,13 +65,16 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
             .setOutputFaceBlendshapes(true)
             .setOutputFacialTransformationMatrixes(false)
             .build()
-        faceLandmarker = FaceLandmarker.createFromOptions(context, options)
+        faceLandmarker = FaceLandmarker.createFromOptions(appContext, options)
     }
 
     fun reset() {
+        // Settings are intentionally re-read between drives. This lets a driver change
+        // RELAXED/NORMAL/SENSITIVE/CUSTOM while parked without recreating the Activity.
+        config = AttentionConfig.fromContext(appContext)
         calibration.clear()
         baseline = null
-        policy.reset()
+        policy.reconfigure(config)
     }
 
     fun analyze(bitmap: Bitmap, timestampMs: Long = SystemClock.uptimeMillis()): FaceAnalysis {
@@ -89,7 +94,7 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
                 triggers = decision.triggers,
                 rawEyesClosed = false,
                 rawAway = false,
-                detail = "HF face missing ${decision.missingEvidenceMs.toInt()} ms",
+                detail = "${config.mode.label} · face missing ${decision.missingEvidenceMs.toInt()}/${decision.missingTriggerMs.toInt()} ms",
                 normalizedPoints = emptyList(),
                 inferenceMs = SystemClock.elapsedRealtime() - started
             )
@@ -142,13 +147,11 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
         if (b != null) {
             yawDelta = abs(metrics.yaw - b.yaw)
             pitchDelta = abs(metrics.pitch - b.pitch)
-            // v1.3 uses a deliberately wider normal-driving dead zone so ordinary
-            // mirror/window/blind-spot checks don't immediately count as distraction.
-            rawAway = yawDelta > 0.15f || pitchDelta > 0.20f
-            pitchDominant = pitchDelta > 0.20f && pitchDelta >= yawDelta
+            rawAway = yawDelta > config.yawDeadZone || pitchDelta > config.pitchDeadZone
+            pitchDominant = pitchDelta > config.pitchDeadZone && pitchDelta >= yawDelta
         }
 
-        val strongSideTurn = b != null && yawDelta > 0.13f
+        val strongSideTurn = b != null && yawDelta > config.strongSideTurnYaw
         var rawEyes = if (b == null) {
             metrics.blinkAvg >= 0.62f ||
                 (metrics.blinkLeft > 0.58f && metrics.blinkRight > 0.58f) ||
@@ -161,9 +164,8 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
                 (!strongSideTurn && metrics.ear > 0f && metrics.ear < earThreshold)
         }
 
-        // Side profiles can distort both eye geometry and blendshape scores. During a
-        // clear side turn, do not create the faster EYES_CLOSED path; the slower
-        // head-away policy is the correct signal for a mirror or window check.
+        // Side profiles distort both eye geometry and blendshape scores. A mirror or
+        // shoulder check must never jump into the faster eye-closure alarm path.
         if (strongSideTurn) rawEyes = false
 
         val decision = policy.update(
@@ -203,11 +205,12 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
 
         val points = landmarks.map { it.x() to it.y() }
         val detail = if (baseline == null) {
-            "HF calibrating · blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · ${calibration.size} clean frames"
+            "${config.mode.label} · calibrating · blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · ${calibration.size} clean frames"
         } else {
-            val eyeProgress = ((decision.eyeEvidenceMs / AttentionPolicy.EYE_TRIGGER_MS) * 100f).toInt().coerceIn(0, 100)
-            val turnProgress = ((decision.awayEvidenceMs / AttentionPolicy.AWAY_TRIGGER_MS) * 100f).toInt().coerceIn(0, 100)
-            "HF blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · eye ${eyeProgress}% · turn ${turnProgress}%"
+            val eyeProgress = ((decision.eyeEvidenceMs / decision.eyeTriggerMs) * 100f).toInt().coerceIn(0, 100)
+            val turnProgress = ((decision.awayEvidenceMs / decision.awayTriggerMs) * 100f).toInt().coerceIn(0, 100)
+            val scanType = if (pitchDominant) "vertical" else "side"
+            "${config.mode.label} · blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · eye $eyeProgress% · $scanType $turnProgress%"
         }
 
         return FaceAnalysis(
