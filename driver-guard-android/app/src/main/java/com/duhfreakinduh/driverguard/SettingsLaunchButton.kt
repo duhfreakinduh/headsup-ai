@@ -12,7 +12,7 @@ class SettingsLaunchButton @JvmOverloads constructor(
 ) : AppCompatButton(context, attrs, defStyleAttr) {
     init {
         setOnClickListener {
-            context.startActivity(Intent(context, SettingsActivity::class.java))
+            context.startActivity(Intent(context, SettingsHubActivity::class.java))
         }
     }
 }
