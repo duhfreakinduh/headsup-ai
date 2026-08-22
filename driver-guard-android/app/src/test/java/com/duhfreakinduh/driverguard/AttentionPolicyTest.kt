@@ -15,36 +15,34 @@ class AttentionPolicyTest {
     }
 
     @Test
-    fun longBlinkUnderNineTenthsDoesNotTrigger() {
+    fun oneSecondEyeClosureDoesNotTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, true, false), 0)
-        for (time in 100L..800L step 100L) {
+        for (time in 100L..1000L step 100L) {
             result = p.update(PolicyInput(true, true, false), time)
         }
-        assertFalse(DriverTrigger.EYES_CLOSED in result.triggers)
-        result = p.update(PolicyInput(true, false, false), 900)
         assertFalse(DriverTrigger.EYES_CLOSED in result.triggers)
     }
 
     @Test
-    fun sustainedClosedEyesTriggers() {
+    fun sustainedClosedEyesEventuallyTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, true, false), 0)
-        for (time in 100L..1100L step 100L) {
+        for (time in 100L..1400L step 100L) {
             result = p.update(PolicyInput(true, true, false), time)
         }
         assertTrue(DriverTrigger.EYES_CLOSED in result.triggers)
     }
 
     @Test
-    fun mirrorGlanceUnderOnePointEightSecondsDoesNotTrigger() {
+    fun threeSecondMirrorGlanceDoesNotTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, false, true), 0)
-        for (time in 100L..1700L step 100L) {
+        for (time in 100L..3000L step 100L) {
             result = p.update(PolicyInput(true, false, true), time)
         }
         assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
-        result = p.update(PolicyInput(true, false, false), 1800)
+        result = p.update(PolicyInput(true, false, false), 3100)
         assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
     }
 
@@ -52,54 +50,54 @@ class AttentionPolicyTest {
     fun sustainedHeadTurnEventuallyTriggers() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, false, true), 0)
-        for (time in 100L..2000L step 100L) {
+        for (time in 100L..4000L step 100L) {
             result = p.update(PolicyInput(true, false, true), time)
         }
         assertTrue(DriverTrigger.HEAD_TURNED in result.triggers)
     }
 
     @Test
-    fun pitchDominantUsesLookingUpDownReasonAfterGrace() {
+    fun pitchDominantUsesLookingUpDownAfterLongGrace() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, false, true, true), 0)
-        for (time in 100L..2000L step 100L) {
+        for (time in 100L..4000L step 100L) {
             result = p.update(PolicyInput(true, false, true, true), time)
         }
         assertTrue(DriverTrigger.LOOKING_UP_DOWN in result.triggers)
     }
 
     @Test
-    fun briefFaceLossDoesNotTrigger() {
+    fun twoPointFiveSecondFaceLossDoesNotTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(false, false, false), 0)
-        for (time in 100L..1700L step 100L) {
+        for (time in 100L..2500L step 100L) {
             result = p.update(PolicyInput(false, false, false), time)
         }
         assertFalse(DriverTrigger.FACE_MISSING in result.triggers)
     }
 
     @Test
-    fun sustainedFaceLossTriggers() {
+    fun sustainedFaceLossEventuallyTriggers() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(false, false, false), 0)
-        for (time in 100L..2000L step 100L) {
+        for (time in 100L..3500L step 100L) {
             result = p.update(PolicyInput(false, false, false), time)
         }
         assertTrue(DriverTrigger.FACE_MISSING in result.triggers)
     }
 
     @Test
-    fun recoveryClearsHeadTurnEvidenceQuickly() {
+    fun returningForwardClearsMirrorEvidenceFast() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, false, true), 0)
-        for (time in 100L..1600L step 100L) {
+        for (time in 100L..3000L step 100L) {
             result = p.update(PolicyInput(true, false, true), time)
         }
         assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
-        result = p.update(PolicyInput(true, false, false), 1700)
-        result = p.update(PolicyInput(true, false, false), 1800)
-        result = p.update(PolicyInput(true, false, false), 1900)
+        result = p.update(PolicyInput(true, false, false), 3100)
+        result = p.update(PolicyInput(true, false, false), 3200)
+        result = p.update(PolicyInput(true, false, false), 3300)
         assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
-        assertTrue(result.awayEvidenceMs < 600f)
+        assertTrue(result.awayEvidenceMs < 700f)
     }
 }
