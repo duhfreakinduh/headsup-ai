@@ -13,6 +13,12 @@ object FeatureSettings {
     const val KEY_REAR_ROAD_GUARD = "rear_road_guard"
     const val KEY_ROAD_HAZARDS = "road_hazards"
 
+    const val KEY_DRIVER_SENSITIVITY = "driver_sensitivity"
+    const val KEY_CUSTOM_EYES_MS = "custom_eyes_ms"
+    const val KEY_CUSTOM_MIRROR_MS = "custom_mirror_ms"
+    const val KEY_CUSTOM_LOOK_DOWN_MS = "custom_look_down_ms"
+    const val KEY_CUSTOM_MISSING_MS = "custom_missing_ms"
+
     const val KEY_TEEN_MODE = "teen_mode"
     const val KEY_TEEN_PARENT_PHONE = "teen_parent_phone"
     const val KEY_TEEN_EVENT_LIMIT = "teen_event_limit"
