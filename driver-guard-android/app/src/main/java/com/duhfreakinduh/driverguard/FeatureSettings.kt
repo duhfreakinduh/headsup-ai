@@ -13,7 +13,16 @@ object FeatureSettings {
     const val KEY_REAR_ROAD_GUARD = "rear_road_guard"
     const val KEY_ROAD_HAZARDS = "road_hazards"
 
-    private fun prefs(context: Context) =
+    const val KEY_TEEN_MODE = "teen_mode"
+    const val KEY_TEEN_PARENT_PHONE = "teen_parent_phone"
+    const val KEY_TEEN_EVENT_LIMIT = "teen_event_limit"
+    const val KEY_TEEN_MAJOR_EYES = "teen_major_eyes"
+    const val KEY_TEEN_MAJOR_PHONE = "teen_major_phone"
+    const val KEY_TEEN_MAJOR_ALARM = "teen_major_alarm"
+    const val KEY_TEEN_PIN_SALT = "teen_pin_salt"
+    const val KEY_TEEN_PIN_HASH = "teen_pin_hash"
+
+    fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun enabled(context: Context, key: String, defaultValue: Boolean = true): Boolean =
@@ -21,5 +30,19 @@ object FeatureSettings {
 
     fun setEnabled(context: Context, key: String, enabled: Boolean) {
         prefs(context).edit().putBoolean(key, enabled).apply()
+    }
+
+    fun string(context: Context, key: String, defaultValue: String = ""): String =
+        prefs(context).getString(key, defaultValue) ?: defaultValue
+
+    fun setString(context: Context, key: String, value: String) {
+        prefs(context).edit().putString(key, value).apply()
+    }
+
+    fun int(context: Context, key: String, defaultValue: Int): Int =
+        prefs(context).getInt(key, defaultValue)
+
+    fun setInt(context: Context, key: String, value: Int) {
+        prefs(context).edit().putInt(key, value).apply()
     }
 }
