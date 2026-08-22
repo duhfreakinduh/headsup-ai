@@ -22,8 +22,12 @@ class AlarmController(private val context: Context) : AutoCloseable, TextToSpeec
     private val pulse = object : Runnable {
         override fun run() {
             if (!alarming) return
-            tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 720)
-            vibrate(longArrayOf(0, 450, 90, 450))
+            if (FeatureSettings.enabled(context, FeatureSettings.KEY_ALARM_TONE, true)) {
+                tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 720)
+            }
+            if (FeatureSettings.enabled(context, FeatureSettings.KEY_VIBRATION, true)) {
+                vibrate(longArrayOf(0, 450, 90, 450))
+            }
             handler.postDelayed(this, 920)
         }
     }
@@ -43,11 +47,13 @@ class AlarmController(private val context: Context) : AutoCloseable, TextToSpeec
             DriverTrigger.FACE_MISSING -> "I cannot see you. Eyes on the road."
             else -> "Eyes on the road."
         }
-        if (ttsReady) {
+        if (ttsReady && FeatureSettings.enabled(context, FeatureSettings.KEY_VOICE_WARNINGS, true)) {
             tts.stop()
             tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "driver-warning")
         }
-        vibrate(longArrayOf(0, 240, 90, 240))
+        if (FeatureSettings.enabled(context, FeatureSettings.KEY_VIBRATION, true)) {
+            vibrate(longArrayOf(0, 240, 90, 240))
+        }
     }
 
     fun startAlarm() {
@@ -65,8 +71,12 @@ class AlarmController(private val context: Context) : AutoCloseable, TextToSpeec
     fun testAlarm() {
         warning(DriverTrigger.EYES_CLOSED)
         handler.postDelayed({
-            tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 850)
-            vibrate(longArrayOf(0, 500, 100, 500))
+            if (FeatureSettings.enabled(context, FeatureSettings.KEY_ALARM_TONE, true)) {
+                tone.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 850)
+            }
+            if (FeatureSettings.enabled(context, FeatureSettings.KEY_VIBRATION, true)) {
+                vibrate(longArrayOf(0, 500, 100, 500))
+            }
         }, 900)
     }
 
