@@ -17,6 +17,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -48,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private var phoneDetector: PhoneDetector? = null
     private var running = false
     private var pendingStart = false
+    private var teenPreDriveApproved = false
     private var lastAnalysisMs = 0L
     private var lastPhoneScanMs = 0L
     private var phoneVisibleUntilMs = 0L
@@ -140,8 +142,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestStart() {
         if (running) return
-        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (TeenModeManager.isEnabled(this) && !teenPreDriveApproved) {
+            showTeenPreDriveCheck()
+            return
+        }
+
+        val permissions = mutableListOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
         if (Build.VERSION.SDK_INT >= 33) permissions += Manifest.permission.POST_NOTIFICATIONS
+        if (TeenModeManager.isEnabled(this)) permissions += Manifest.permission.SEND_SMS
+
         val missing = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
@@ -153,6 +166,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showTeenPreDriveCheck() {
+        AlertDialog.Builder(this)
+            .setTitle("Teen Driver Check")
+            .setMessage(
+                "Teen Mode is ON. Keep Driver Guard running, keep the phone mounted, and do not change settings while driving. " +
+                    "Major safety events or too many warnings can automatically text the saved parent number."
+            )
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("I'M READY") { _, _ ->
+                teenPreDriveApproved = true
+                requestStart()
+            }
+            .show()
+    }
+
     private fun startDriveInternal() {
         if (running) return
         binding.startButton.isEnabled = false
@@ -160,9 +188,18 @@ class MainActivity : AppCompatActivity() {
         binding.cameraMessage.text = "Loading Hugging Face face AI…"
         binding.faceText.text = "LOADING"
         tripRecorder.start()
+        if (TeenModeManager.isEnabled(this)) TeenModeManager.beginDrive()
         clearTripMap()
         clearAlertEpisode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        if (TeenModeManager.isEnabled(this)) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                appendEventLog("TEEN MODE: active · parent SMS alerts armed")
+            } else {
+                appendEventLog("TEEN MODE: active · SMS permission missing")
+            }
+        }
 
         val locationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -181,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                     binding.stopButton.isEnabled = true
                     binding.faceText.text = "SEARCHING"
                     binding.faceDetail.text = "HF model loaded on-device"
-                    binding.statusText.text = "PROTECTION"
+                    binding.statusText.text = if (TeenModeManager.isEnabled(this)) "TEEN PROTECTION" else "PROTECTION"
                     binding.reasonText.text = "Finding face and fast-calibrating"
                     bindCamera()
                     if (binding.phoneCheck.isChecked) loadPhoneDetectorAsync()
@@ -439,6 +476,11 @@ class MainActivity : AppCompatActivity() {
         tripRecorder.addEvent(type, labels)
         appendEventLog("${type.uppercase()}: ${labels.joinToString(" • ").ifBlank { "drive" }}")
         if (type in setOf("trigger", "warning", "alarm", "phone_detected")) addEventMarker(type, labels)
+
+        val teenResult = TeenModeManager.onEvent(this, type, triggers)
+        if (teenResult != null && teenResult != "Parent alert rate-limited") {
+            appendEventLog("TEEN: $teenResult")
+        }
         updateTripStats()
     }
 
@@ -504,6 +546,8 @@ class MainActivity : AppCompatActivity() {
         faceEngine?.reset()
         stopService(Intent(this, DriveMonitorService::class.java))
         clearAlertEpisode()
+        TeenModeManager.endDrive()
+        teenPreDriveApproved = false
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val saved = tripRecorder.stopAndSave()
         binding.startButton.isEnabled = true
@@ -521,6 +565,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun startFailed(e: Exception) {
         running = false
+        teenPreDriveApproved = false
+        TeenModeManager.endDrive()
         stopService(Intent(this, DriveMonitorService::class.java))
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tripRecorder.stopAndSave()
@@ -538,6 +584,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
+        if (TeenModeManager.isEnabled(this)) {
+            binding.phoneCheck.isEnabled = false
+        }
     }
 
     override fun onPause() {
