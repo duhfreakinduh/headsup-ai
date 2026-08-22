@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DriverGuard" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#07111F</item>
+        <item name="android:navigationBarColor">#07111F</item>
+        <item name="colorPrimary">#35E08A</item>
+        <item name="colorSecondary">#5CB8FF</item>
+        <item name="android:windowBackground">#07111F</item>
+    </style>
+</resources>

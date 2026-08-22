@@ -1,0 +1,8 @@
+.gradle/
+.idea/
+local.properties
+app/build/
+build/
+app/src/main/assets/face_landmarker.task
+app/src/main/assets/yolos_tiny_quantized.onnx
+*.iml

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#07111F"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="DRIVER GUARD AI"
+            android:textColor="#35E08A"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Native Android Driver Monitor"
+            android:textColor="#FFFFFF"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="#24334A"
+            android:padding="10dp"
+            android:text="Set up and test while parked. Mount the phone so the front camera sees your whole face and both eyes. Do not touch the app while driving."
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:layout_marginTop="12dp"
+            android:background="#000000">
+
+            <androidx.camera.view.PreviewView
+                android:id="@+id/previewView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:implementationMode="performance"
+                app:scaleType="fillCenter" />
+
+            <com.duhfreakinduh.driverguard.FaceOverlayView
+                android:id="@+id/faceOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/cameraMessage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:background="#CC07111F"
+                android:padding="10dp"
+                android:text="Tap START DRIVE while parked"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#142235"
+                android:orientation="vertical"
+                android:padding="10dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DRIVER" android:textColor="#8FA8C2" android:textSize="11sp" />
+                <TextView android:id="@+id/statusText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="READY" android:textColor="#35E08A" android:textSize="20sp" android:textStyle="bold" />
+                <TextView android:id="@+id/reasonText" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Monitoring off" android:textColor="#FFFFFF" android:textSize="12sp" />
+            </LinearLayout>
+
+            <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="#142235"
+                android:orientation="vertical"
+                android:padding="10dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HF FACE / EYES" android:textColor="#8FA8C2" android:textSize="11sp" />
+                <TextView android:id="@+id/faceText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WAITING" android:textColor="#5CB8FF" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:id="@+id/faceDetail" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Hugging Face model" android:textColor="#FFFFFF" android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/phoneStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#142235"
+            android:padding="9dp"
+            android:text="HF PHONE AI: waiting"
+            android:textColor="#FFFFFF" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+            <Button android:id="@+id/startButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Start drive" />
+            <Space android:layout_width="6dp" android:layout_height="1dp" />
+            <Button android:id="@+id/stopButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:enabled="false" android:text="Stop + save" />
+            <Space android:layout_width="6dp" android:layout_height="1dp" />
+            <Button android:id="@+id/testButton" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Test alarm" />
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/phoneCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Detect visible cell phone with Hugging Face YOLOS"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="LIVE TRIP"
+            android:textColor="#5CB8FF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView android:id="@+id/speedText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="#142235" android:gravity="center" android:padding="10dp" android:text="0 mph\nSPEED" android:textColor="#FFFFFF" android:textStyle="bold" />
+            <Space android:layout_width="6dp" android:layout_height="1dp" />
+            <TextView android:id="@+id/distanceText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="#142235" android:gravity="center" android:padding="10dp" android:text="0.00 mi\nDISTANCE" android:textColor="#FFFFFF" android:textStyle="bold" />
+            <Space android:layout_width="6dp" android:layout_height="1dp" />
+            <TextView android:id="@+id/eventCountText" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:background="#142235" android:gravity="center" android:padding="10dp" android:text="0\nEVENTS" android:textColor="#FFFFFF" android:textStyle="bold" />
+        </LinearLayout>
+
+        <org.osmdroid.views.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_marginTop="10dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="EVENT LOG"
+            android:textColor="#5CB8FF"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/eventLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="100dp"
+            android:background="#142235"
+            android:padding="10dp"
+            android:text="No events yet."
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:paddingBottom="20dp"
+            android:text="Experimental driver-assistance prototype. Camera inference stays on-device. The bundled face and phone AI model files are downloaded from Hugging Face during the build."
+            android:textColor="#8FA8C2"
+            android:textSize="11sp" />
+    </LinearLayout>
+</ScrollView>
