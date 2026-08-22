@@ -25,6 +25,12 @@ data class PolicyDecision(
 )
 
 class AttentionPolicy {
+    companion object {
+        const val EYE_TRIGGER_MS = 700f
+        const val AWAY_TRIGGER_MS = 300f
+        const val MISSING_TRIGGER_MS = 700f
+    }
+
     private var lastTimestampMs: Long? = null
     private var eyeEvidenceMs = 0f
     private var awayEvidenceMs = 0f
@@ -43,14 +49,14 @@ class AttentionPolicy {
 
         if (!input.hasFace) {
             missingEvidenceMs = (missingEvidenceMs + dt).coerceAtMost(3000f)
-            eyeEvidenceMs = (eyeEvidenceMs - dt * 3.5f).coerceAtLeast(0f)
+            eyeEvidenceMs = (eyeEvidenceMs - dt * 4f).coerceAtLeast(0f)
             awayEvidenceMs = (awayEvidenceMs - dt * 3f).coerceAtLeast(0f)
         } else {
             missingEvidenceMs = (missingEvidenceMs - dt * 4f).coerceAtLeast(0f)
             eyeEvidenceMs = if (input.rawEyesClosed) {
-                (eyeEvidenceMs + dt).coerceAtMost(1200f)
+                (eyeEvidenceMs + dt).coerceAtMost(1800f)
             } else {
-                (eyeEvidenceMs - dt * 2.8f).coerceAtLeast(0f)
+                (eyeEvidenceMs - dt * 4f).coerceAtLeast(0f)
             }
             awayEvidenceMs = if (input.rawAway) {
                 (awayEvidenceMs + dt).coerceAtMost(1800f)
@@ -60,11 +66,11 @@ class AttentionPolicy {
         }
 
         val triggers = linkedSetOf<DriverTrigger>()
-        if (eyeEvidenceMs >= 220f) triggers += DriverTrigger.EYES_CLOSED
-        if (awayEvidenceMs >= 300f) {
+        if (eyeEvidenceMs >= EYE_TRIGGER_MS) triggers += DriverTrigger.EYES_CLOSED
+        if (awayEvidenceMs >= AWAY_TRIGGER_MS) {
             triggers += if (input.pitchDominant) DriverTrigger.LOOKING_UP_DOWN else DriverTrigger.HEAD_TURNED
         }
-        if (missingEvidenceMs >= 700f) triggers += DriverTrigger.FACE_MISSING
+        if (missingEvidenceMs >= MISSING_TRIGGER_MS) triggers += DriverTrigger.FACE_MISSING
 
         return PolicyDecision(
             triggers = triggers,
