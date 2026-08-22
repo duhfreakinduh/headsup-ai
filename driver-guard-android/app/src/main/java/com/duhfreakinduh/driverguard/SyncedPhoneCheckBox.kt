@@ -15,15 +15,20 @@ class SyncedPhoneCheckBox @JvmOverloads constructor(
     private var syncing = false
 
     init {
-        isChecked = FeatureSettings.enabled(context, FeatureSettings.KEY_PHONE_DETECTION, true)
+        syncState()
         setOnCheckedChangeListener { _, checked ->
-            if (!syncing) FeatureSettings.setEnabled(context, FeatureSettings.KEY_PHONE_DETECTION, checked)
+            if (!syncing && !TeenModeManager.isEnabled(context)) {
+                FeatureSettings.setEnabled(context, FeatureSettings.KEY_PHONE_DETECTION, checked)
+            } else if (!syncing && TeenModeManager.isEnabled(context)) {
+                syncState()
+            }
         }
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         prefs.registerOnSharedPreferenceChangeListener(this)
+        syncState()
     }
 
     override fun onDetachedFromWindow() {
@@ -32,11 +37,16 @@ class SyncedPhoneCheckBox @JvmOverloads constructor(
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key != FeatureSettings.KEY_PHONE_DETECTION) return
-        val wanted = FeatureSettings.enabled(context, FeatureSettings.KEY_PHONE_DETECTION, true)
-        if (wanted == isChecked) return
+        if (key == FeatureSettings.KEY_PHONE_DETECTION || key == FeatureSettings.KEY_TEEN_MODE) {
+            syncState()
+        }
+    }
+
+    private fun syncState() {
         syncing = true
-        isChecked = wanted
+        isChecked = FeatureSettings.enabled(context, FeatureSettings.KEY_PHONE_DETECTION, true)
+        isEnabled = !TeenModeManager.isEnabled(context)
+        alpha = if (isEnabled) 1f else 0.6f
         syncing = false
     }
 }
