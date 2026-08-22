@@ -195,7 +195,9 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
         val detail = if (baseline == null) {
             "HF calibrating · blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · ${calibration.size} clean frames"
         } else {
-            "HF blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · eye ${(decision.eyeEvidenceMs / 2.2f).toInt().coerceIn(0,100)}% · turn ${(decision.awayEvidenceMs / 3f).toInt().coerceIn(0,100)}%"
+            val eyeProgress = ((decision.eyeEvidenceMs / AttentionPolicy.EYE_TRIGGER_MS) * 100f).toInt().coerceIn(0, 100)
+            val turnProgress = ((decision.awayEvidenceMs / AttentionPolicy.AWAY_TRIGGER_MS) * 100f).toInt().coerceIn(0, 100)
+            "HF blink ${(metrics.blinkAvg * 100).toInt()}% · eye ${"%.2f".format(metrics.ear)} · eye ${eyeProgress}% · turn ${turnProgress}%"
         }
 
         return FaceAnalysis(
