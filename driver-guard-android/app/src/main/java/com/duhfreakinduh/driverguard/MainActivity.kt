@@ -20,9 +20,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.duhfreakinduh.driverguard.databinding.ActivityMainBinding
@@ -42,18 +44,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tripRecorder: TripRecorder
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val phoneExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val roadCameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val roadInferenceExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val phoneBusy = AtomicBoolean(false)
+    private val roadBusy = AtomicBoolean(false)
+    private val smithCoach = SmithCoach()
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var faceEngine: FaceAttentionEngine? = null
     private var phoneDetector: PhoneDetector? = null
+    private var roadDetector: RoadDetector? = null
     private var running = false
     private var pendingStart = false
     private var teenPreDriveApproved = false
+    private var roadGuardActive = false
     private var lastAnalysisMs = 0L
     private var lastPhoneScanMs = 0L
     private var phoneVisibleUntilMs = 0L
     private var lastPhoneEventMs = 0L
+    private var lastRoadScanMs = 0L
+    private var lastRoadAlertMs = 0L
 
     private var episodeStartedMs: Long? = null
     private var warningSent = false
@@ -97,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         alarmController = AlarmController(this)
         tripRecorder = TripRecorder(this)
         setupMap()
+        refreshOptionalFeatureUi()
 
         ContextCompat.registerReceiver(
             this,
@@ -125,6 +136,15 @@ class MainActivity : AppCompatActivity() {
                 binding.phoneStatus.text = "HF PHONE AI: disabled"
             }
         }
+    }
+
+    private fun refreshOptionalFeatureUi() {
+        val smithEnabled = FeatureSettings.enabled(this, FeatureSettings.KEY_SMITH_COACH, false)
+        val roadEnabled = FeatureSettings.enabled(this, FeatureSettings.KEY_REAR_ROAD_GUARD, false)
+        binding.smithStatus.visibility = if (smithEnabled) View.VISIBLE else View.GONE
+        if (smithEnabled && !running) binding.smithStatus.text = "SMITH COACH: ready · brief scans are encouraged"
+        binding.roadGuardPanel.visibility = if (roadEnabled) View.VISIBLE else View.GONE
+        if (roadEnabled && !running) binding.roadStatusText.text = "Road Guard ready · starts with drive"
     }
 
     private fun setupMap() {
@@ -189,8 +209,13 @@ class MainActivity : AppCompatActivity() {
         binding.faceText.text = "LOADING"
         tripRecorder.start()
         if (TeenModeManager.isEnabled(this)) TeenModeManager.beginDrive()
+        smithCoach.reset(SystemClock.uptimeMillis())
+        lastRoadScanMs = 0L
+        lastRoadAlertMs = 0L
         clearTripMap()
         clearAlertEpisode()
+        binding.roadOverlay.clear()
+        refreshOptionalFeatureUi()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         if (TeenModeManager.isEnabled(this)) {
@@ -207,6 +232,10 @@ class MainActivity : AppCompatActivity() {
             ContextCompat.startForegroundService(this, Intent(this, DriveMonitorService::class.java))
         } else {
             appendEventLog("GPS permission not granted — route tracking unavailable")
+        }
+
+        if (FeatureSettings.enabled(this, FeatureSettings.KEY_REAR_ROAD_GUARD, false)) {
+            loadRoadDetectorAsync()
         }
 
         cameraExecutor.execute {
@@ -236,27 +265,99 @@ class MainActivity : AppCompatActivity() {
             try {
                 val provider = future.get()
                 cameraProvider = provider
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(binding.previewView.surfaceProvider)
+                val wantsRoadGuard = FeatureSettings.enabled(this, FeatureSettings.KEY_REAR_ROAD_GUARD, false)
+                if (wantsRoadGuard && bindConcurrentFrontRear(provider)) {
+                    binding.cameraMessage.text = "Center your face and look forward"
+                    binding.roadStatusText.text = if (roadDetector == null) "Rear camera active · loading YOLOS…" else "Rear camera active · scanning road"
+                } else {
+                    bindFrontOnly(provider)
+                    if (wantsRoadGuard) {
+                        binding.roadGuardPanel.visibility = View.VISIBLE
+                        binding.roadStatusText.text = "Road Guard unavailable: this phone/camera combination cannot stream front + rear together"
+                    }
                 }
-                val analysis = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(640, 480))
-                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                analysis.setAnalyzer(cameraExecutor, ::analyzeFrame)
-                provider.unbindAll()
-                provider.bindToLifecycle(
-                    this,
-                    CameraSelector.DEFAULT_FRONT_CAMERA,
-                    preview,
-                    analysis
-                )
-                binding.cameraMessage.text = "Center your face and look forward"
             } catch (e: Exception) {
                 startFailed(e)
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun bindConcurrentFrontRear(provider: ProcessCameraProvider): Boolean {
+        var frontSelector: CameraSelector? = null
+        var rearSelector: CameraSelector? = null
+        for (combination in provider.availableConcurrentCameraInfos) {
+            val frontInfo = combination.firstOrNull { it.lensFacing == CameraSelector.LENS_FACING_FRONT }
+            val rearInfo = combination.firstOrNull { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+            if (frontInfo != null && rearInfo != null) {
+                frontSelector = frontInfo.cameraSelector
+                rearSelector = rearInfo.cameraSelector
+                break
+            }
+        }
+        if (frontSelector == null || rearSelector == null) return false
+
+        val frontPreview = Preview.Builder().build().also {
+            it.setSurfaceProvider(binding.previewView.surfaceProvider)
+        }
+        val frontAnalysis = ImageAnalysis.Builder()
+            .setTargetResolution(Size(640, 480))
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build().also { it.setAnalyzer(cameraExecutor, ::analyzeFrame) }
+        val frontGroup = UseCaseGroup.Builder()
+            .addUseCase(frontPreview)
+            .addUseCase(frontAnalysis)
+            .build()
+
+        val rearPreview = Preview.Builder().build().also {
+            it.setSurfaceProvider(binding.roadPreviewView.surfaceProvider)
+        }
+        val rearAnalysis = ImageAnalysis.Builder()
+            .setTargetResolution(Size(640, 480))
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build().also { it.setAnalyzer(roadCameraExecutor, ::analyzeRoadFrame) }
+        val rearGroup = UseCaseGroup.Builder()
+            .addUseCase(rearPreview)
+            .addUseCase(rearAnalysis)
+            .build()
+
+        return try {
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                listOf(
+                    ConcurrentCamera.SingleCameraConfig(frontSelector, frontGroup, this),
+                    ConcurrentCamera.SingleCameraConfig(rearSelector, rearGroup, this)
+                )
+            )
+            roadGuardActive = true
+            binding.roadGuardPanel.visibility = View.VISIBLE
+            true
+        } catch (_: Exception) {
+            roadGuardActive = false
+            false
+        }
+    }
+
+    private fun bindFrontOnly(provider: ProcessCameraProvider) {
+        roadGuardActive = false
+        val preview = Preview.Builder().build().also {
+            it.setSurfaceProvider(binding.previewView.surfaceProvider)
+        }
+        val analysis = ImageAnalysis.Builder()
+            .setTargetResolution(Size(640, 480))
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+        analysis.setAnalyzer(cameraExecutor, ::analyzeFrame)
+        provider.unbindAll()
+        provider.bindToLifecycle(
+            this,
+            CameraSelector.DEFAULT_FRONT_CAMERA,
+            preview,
+            analysis
+        )
+        binding.cameraMessage.text = "Center your face and look forward"
     }
 
     private fun analyzeFrame(image: ImageProxy) {
@@ -272,7 +373,7 @@ class MainActivity : AppCompatActivity() {
         lastAnalysisMs = now
 
         val bitmap = try {
-            imageToBitmap(image)
+            imageToBitmap(image, mirror = true)
         } catch (e: Exception) {
             image.close()
             runOnUiThread {
@@ -328,7 +429,41 @@ class MainActivity : AppCompatActivity() {
         bitmap.recycle()
     }
 
-    private fun imageToBitmap(image: ImageProxy): Bitmap {
+    private fun analyzeRoadFrame(image: ImageProxy) {
+        if (!running || !roadGuardActive || !FeatureSettings.enabled(this, FeatureSettings.KEY_REAR_ROAD_GUARD, false)) {
+            image.close()
+            return
+        }
+        val now = SystemClock.uptimeMillis()
+        if (now - lastRoadScanMs < 1100L || roadDetector == null || !roadBusy.compareAndSet(false, true)) {
+            image.close()
+            return
+        }
+        lastRoadScanMs = now
+
+        val bitmap = try {
+            imageToBitmap(image, mirror = false)
+        } catch (e: Exception) {
+            image.close()
+            roadBusy.set(false)
+            runOnUiThread { binding.roadStatusText.text = "Road camera error: ${e.message ?: "frame failed"}" }
+            return
+        }
+
+        roadInferenceExecutor.execute {
+            try {
+                val detections = roadDetector?.detect(bitmap).orEmpty()
+                runOnUiThread { applyRoadDetections(detections) }
+            } catch (e: Exception) {
+                runOnUiThread { binding.roadStatusText.text = "Road AI error: ${e.message ?: "scan failed"}" }
+            } finally {
+                bitmap.recycle()
+                roadBusy.set(false)
+            }
+        }
+    }
+
+    private fun imageToBitmap(image: ImageProxy, mirror: Boolean): Bitmap {
         val rotation = image.imageInfo.rotationDegrees
         val source = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
         val buffer = image.planes[0].buffer
@@ -337,7 +472,7 @@ class MainActivity : AppCompatActivity() {
         image.close()
         val matrix = Matrix().apply {
             postRotate(rotation.toFloat())
-            postScale(-1f, 1f)
+            if (mirror) postScale(-1f, 1f)
         }
         val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
         if (rotated !== source) source.recycle()
@@ -361,7 +496,45 @@ class MainActivity : AppCompatActivity() {
         binding.cameraMessage.visibility = if (result.calibrated) View.GONE else View.VISIBLE
         if (!result.calibrated && result.hasFace) binding.cameraMessage.text = if (result.rawEyesClosed) "Open both eyes to calibrate" else "Look forward — calibrating"
         if (!result.hasFace) binding.cameraMessage.text = "Face not visible — protection active"
+
+        if (FeatureSettings.enabled(this, FeatureSettings.KEY_SMITH_COACH, false)) {
+            binding.smithStatus.visibility = View.VISIBLE
+            val coach = smithCoach.update(
+                rawAway = result.rawAway,
+                hasAttentionTrigger = triggers.isNotEmpty(),
+                nowMs = SystemClock.uptimeMillis()
+            )
+            binding.smithStatus.text = "SMITH COACH: ${coach.message} · scans ${coach.scanCount}"
+        } else {
+            binding.smithStatus.visibility = View.GONE
+        }
+
         updateAlertEpisode(triggers, rawDanger)
+    }
+
+    private fun applyRoadDetections(detections: List<RoadDetection>) {
+        binding.roadOverlay.setDetections(detections)
+        val top = detections.firstOrNull()
+        if (top == null) {
+            binding.roadStatusText.text = "ROAD CLEAR · selected YOLOS road objects not in lane corridor"
+            return
+        }
+
+        val extra = if (detections.size > 1) " +${detections.size - 1}" else ""
+        binding.roadStatusText.text = when (top.risk) {
+            RoadRisk.HAZARD -> "HAZARD: ${top.label} ahead ${(top.confidence * 100).toInt()}%$extra"
+            RoadRisk.WATCH -> "WATCH: ${top.label} in forward lane ${(top.confidence * 100).toInt()}%$extra"
+            RoadRisk.NONE -> "ROAD CLEAR"
+        }
+
+        if (top.risk == RoadRisk.HAZARD && FeatureSettings.enabled(this, FeatureSettings.KEY_ROAD_HAZARDS, false)) {
+            val now = SystemClock.uptimeMillis()
+            if (now - lastRoadAlertMs >= 5000L) {
+                lastRoadAlertMs = now
+                alarmController.roadWarning(top.label)
+                recordRoadEvent(top)
+            }
+        }
     }
 
     private fun updateAlertEpisode(triggers: Set<DriverTrigger>, rawDanger: Boolean) {
@@ -471,6 +644,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadRoadDetectorAsync() {
+        if (roadDetector != null) return
+        binding.roadGuardPanel.visibility = View.VISIBLE
+        binding.roadStatusText.text = "ROAD AI: loading Hugging Face YOLOS…"
+        roadInferenceExecutor.execute {
+            try {
+                val detector = RoadDetector(this)
+                roadDetector = detector
+                runOnUiThread {
+                    binding.roadStatusText.text = if (roadGuardActive) "ROAD AI ready · scanning lane" else "ROAD AI ready · waiting for rear camera"
+                }
+            } catch (e: Exception) {
+                runOnUiThread { binding.roadStatusText.text = "ROAD AI: ${e.message ?: "load failed"}" }
+            }
+        }
+    }
+
     private fun recordEvent(type: String, triggers: Collection<DriverTrigger>) {
         val labels = triggers.map { it.label }
         tripRecorder.addEvent(type, labels)
@@ -478,6 +668,18 @@ class MainActivity : AppCompatActivity() {
         if (type in setOf("trigger", "warning", "alarm", "phone_detected")) addEventMarker(type, labels)
 
         val teenResult = TeenModeManager.onEvent(this, type, triggers)
+        if (teenResult != null && teenResult != "Parent alert rate-limited") {
+            appendEventLog("TEEN: $teenResult")
+        }
+        updateTripStats()
+    }
+
+    private fun recordRoadEvent(detection: RoadDetection) {
+        val label = "${detection.label} ahead"
+        tripRecorder.addEvent("road_hazard", listOf(label))
+        appendEventLog("ROAD HAZARD: $label · ${(detection.confidence * 100).toInt()}%")
+        addEventMarker("road_hazard", listOf(label))
+        val teenResult = TeenModeManager.onRoadHazard(this, detection.label, detection.risk)
         if (teenResult != null && teenResult != "Parent alert rate-limited") {
             appendEventLog("TEEN: $teenResult")
         }
@@ -542,12 +744,17 @@ class MainActivity : AppCompatActivity() {
     private fun stopDrive() {
         if (!running) return
         running = false
+        roadGuardActive = false
         cameraProvider?.unbindAll()
         faceEngine?.reset()
         stopService(Intent(this, DriveMonitorService::class.java))
         clearAlertEpisode()
         TeenModeManager.endDrive()
         teenPreDriveApproved = false
+        binding.roadOverlay.clear()
+        if (FeatureSettings.enabled(this, FeatureSettings.KEY_REAR_ROAD_GUARD, false)) {
+            binding.roadStatusText.text = "Road Guard stopped"
+        }
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val saved = tripRecorder.stopAndSave()
         binding.startButton.isEnabled = true
@@ -565,6 +772,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startFailed(e: Exception) {
         running = false
+        roadGuardActive = false
         teenPreDriveApproved = false
         TeenModeManager.endDrive()
         stopService(Intent(this, DriveMonitorService::class.java))
@@ -584,9 +792,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.mapView.onResume()
-        if (TeenModeManager.isEnabled(this)) {
-            binding.phoneCheck.isEnabled = false
-        }
+        binding.phoneCheck.isEnabled = !TeenModeManager.isEnabled(this)
+        refreshOptionalFeatureUi()
     }
 
     override fun onPause() {
@@ -600,9 +807,12 @@ class MainActivity : AppCompatActivity() {
         cameraProvider?.unbindAll()
         faceEngine?.close()
         phoneDetector?.close()
+        roadDetector?.close()
         alarmController.close()
         cameraExecutor.shutdownNow()
         phoneExecutor.shutdownNow()
+        roadCameraExecutor.shutdownNow()
+        roadInferenceExecutor.shutdownNow()
         binding.mapView.onDetach()
         super.onDestroy()
     }
