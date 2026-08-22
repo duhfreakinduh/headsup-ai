@@ -142,14 +142,14 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
         if (b != null) {
             yawDelta = abs(metrics.yaw - b.yaw)
             pitchDelta = abs(metrics.pitch - b.pitch)
-            // A normal mirror glance can move the head a fair amount. Use a larger
-            // pose threshold and let AttentionPolicy apply a long grace period.
-            rawAway = yawDelta > 0.105f || pitchDelta > 0.16f
-            pitchDominant = pitchDelta > 0.16f && pitchDelta >= yawDelta
+            // v1.3 uses a deliberately wider normal-driving dead zone so ordinary
+            // mirror/window/blind-spot checks don't immediately count as distraction.
+            rawAway = yawDelta > 0.15f || pitchDelta > 0.20f
+            pitchDominant = pitchDelta > 0.20f && pitchDelta >= yawDelta
         }
 
-        val strongAway = b != null && (yawDelta > 0.16f || pitchDelta > 0.22f)
-        val rawEyes = if (b == null) {
+        val strongSideTurn = b != null && yawDelta > 0.13f
+        var rawEyes = if (b == null) {
             metrics.blinkAvg >= 0.62f ||
                 (metrics.blinkLeft > 0.58f && metrics.blinkRight > 0.58f) ||
                 (metrics.ear in 0.001f..0.12f)
@@ -158,10 +158,13 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
             val earThreshold = max(0.03f, b.ear * 0.54f)
             metrics.blinkAvg >= blinkThreshold ||
                 (metrics.blinkLeft > 0.55f && metrics.blinkRight > 0.55f) ||
-                // Side-profile mirror checks can compress the eye geometry and fake a
-                // low EAR. Do not use EAR as proof of closed eyes during a strong turn.
-                (!strongAway && metrics.ear > 0f && metrics.ear < earThreshold)
+                (!strongSideTurn && metrics.ear > 0f && metrics.ear < earThreshold)
         }
+
+        // Side profiles can distort both eye geometry and blendshape scores. During a
+        // clear side turn, do not create the faster EYES_CLOSED path; the slower
+        // head-away policy is the correct signal for a mirror or window check.
+        if (strongSideTurn) rawEyes = false
 
         val decision = policy.update(
             PolicyInput(
