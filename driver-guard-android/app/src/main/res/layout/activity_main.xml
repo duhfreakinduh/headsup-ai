@@ -118,6 +118,64 @@
             android:text="HF PHONE AI: waiting"
             android:textColor="#FFFFFF" />
 
+        <TextView
+            android:id="@+id/smithStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#142235"
+            android:padding="9dp"
+            android:text="SMITH COACH: waiting"
+            android:textColor="#FFFFFF"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/roadGuardPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="#142235"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="REAR ROAD GUARD"
+                android:textColor="#5CB8FF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/roadStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Waiting for rear camera"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginTop="6dp"
+                android:background="#000000">
+
+                <androidx.camera.view.PreviewView
+                    android:id="@+id/roadPreviewView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:implementationMode="performance"
+                    app:scaleType="fillCenter" />
+
+                <com.duhfreakinduh.driverguard.RoadOverlayView
+                    android:id="@+id/roadOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </FrameLayout>
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -188,7 +246,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:paddingBottom="20dp"
-            android:text="Experimental driver-assistance prototype. Camera inference stays on-device. The bundled face and phone AI model files are downloaded from Hugging Face during the build."
+            android:text="Experimental driver-assistance prototype. Camera inference stays on-device. Face and YOLOS model files are downloaded from Hugging Face during the build. Road Guard recognizes selected COCO road users/vehicles; it is not a certified collision-avoidance system."
             android:textColor="#8FA8C2"
             android:textSize="11sp" />
     </LinearLayout>

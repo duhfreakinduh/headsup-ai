@@ -21,15 +21,21 @@ import androidx.core.content.ContextCompat
 class SettingsActivity : AppCompatActivity() {
     private lateinit var root: LinearLayout
     private var adultUnlocked = false
+    private var smsTestPending = false
 
     private val smsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            Toast.makeText(this, TeenModeManager.sendTestAlert(this), Toast.LENGTH_LONG).show()
+            if (smsTestPending) {
+                Toast.makeText(this, TeenModeManager.sendTestAlert(this), Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "SMS permission enabled for Teen Mode parent alerts.", Toast.LENGTH_LONG).show()
+            }
         } else {
             Toast.makeText(this, "SMS permission denied — automatic parent texts cannot be sent.", Toast.LENGTH_LONG).show()
         }
+        smsTestPending = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,17 +111,17 @@ class SettingsActivity : AppCompatActivity() {
             }
         })
 
-        section("CURRENT OPTIONAL FEATURES")
+        section("OPTIONAL FEATURES")
         addSettingSwitch(
             "Visible phone detection",
-            "Run the Hugging Face YOLOS phone detector.",
+            "Run the Hugging Face YOLOS phone detector on the driver-facing camera.",
             FeatureSettings.KEY_PHONE_DETECTION,
             true,
             !safetyLocked
         )
         addSettingSwitch(
             "Spoken warnings",
-            "Voice prompts such as Eyes on the road.",
+            "Voice prompts such as Eyes on the road and Road Guard hazard warnings.",
             FeatureSettings.KEY_VOICE_WARNINGS,
             true,
             !safetyLocked
@@ -129,40 +135,38 @@ class SettingsActivity : AppCompatActivity() {
         )
         addSettingSwitch(
             "Loud alarm tone",
-            "Play the repeating alarm tone after a sustained trigger.",
+            "Play the repeating alarm tone after a sustained driver-attention trigger.",
             FeatureSettings.KEY_ALARM_TONE,
             true,
             !safetyLocked
         )
-
-        section("NEXT FEATURE FLAGS")
-        root.addView(TextView(this).apply {
-            text = "These switches are stored now so Smith Coach and rear-camera Road Guard can be added independently without replacing the core app."
-            setTextColor(Color.parseColor("#8FA8C2"))
-            textSize = 12f
-            setPadding(0, 0, 0, dp(6))
-        })
         addSettingSwitch(
             "Smith driving coach",
-            "Optional coaching based on Smith-style scanning, space and escape-route habits.",
+            "Encourages brief mirror/window scanning and the Smith-style big-picture habit without changing the core distraction detector.",
             FeatureSettings.KEY_SMITH_COACH,
             false,
             !safetyLocked
         )
         addSettingSwitch(
             "Rear Road Guard",
-            "Optional rear-camera road monitoring when dual-camera support is added.",
+            "Use the rear camera alongside the front camera when this phone supports concurrent front + rear CameraX streams.",
             FeatureSettings.KEY_REAR_ROAD_GUARD,
             false,
             !safetyLocked
         )
         addSettingSwitch(
             "Road hazard alerts",
-            "Optional in-lane vehicle / pedestrian / obstacle alerts from Road Guard.",
+            "When Rear Road Guard sees a supported vehicle or road user in the forward-lane corridor, allow audible/vibration hazard warnings and trip events.",
             FeatureSettings.KEY_ROAD_HAZARDS,
             false,
             !safetyLocked
         )
+        root.addView(TextView(this).apply {
+            text = "Road Guard v1 recognizes selected YOLOS/COCO road users and vehicles such as people, bicycles, cars, motorcycles, buses and trucks. It does not claim reliable pothole or debris detection yet."
+            setTextColor(Color.parseColor("#8FA8C2"))
+            textSize = 12f
+            setPadding(0, 0, 0, dp(6))
+        })
 
         section("TEEN MODE — ADULT CONTROLLED")
         root.addView(TextView(this).apply {
@@ -217,11 +221,12 @@ class SettingsActivity : AppCompatActivity() {
         val configBox = settingBox()
         configBox.addView(parentPhone)
         configBox.addView(eventLimit)
-        configBox.addView(description("SMS is sent directly from the teen phone. Carrier messaging charges may apply. No cloud parent account is required for this first version."))
+        configBox.addView(description("SMS is sent directly from the teen phone. Carrier messaging charges may apply. No cloud parent account is required for this version."))
 
         addTeenMajorSwitch("Major: any full Driver Guard alarm", FeatureSettings.KEY_TEEN_MAJOR_ALARM, true, hasPin && adultUnlocked)
         addTeenMajorSwitch("Major: sustained eyes-closed alarm", FeatureSettings.KEY_TEEN_MAJOR_EYES, true, hasPin && adultUnlocked)
         addTeenMajorSwitch("Major: visible phone detected", FeatureSettings.KEY_TEEN_MAJOR_PHONE, true, hasPin && adultUnlocked)
+        addTeenMajorSwitch("Major: Road Guard forward-lane hazard", FeatureSettings.KEY_TEEN_MAJOR_ROAD, true, hasPin && adultUnlocked)
 
         root.addView(Button(this).apply {
             text = "SAVE TEEN SETTINGS"
@@ -316,12 +321,11 @@ class SettingsActivity : AppCompatActivity() {
             if (sendTestAfterGrant) Toast.makeText(this, TeenModeManager.sendTestAlert(this), Toast.LENGTH_LONG).show()
             return
         }
-        if (sendTestAfterGrant) {
-            smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
-        } else {
+        smsTestPending = sendTestAfterGrant
+        if (!sendTestAfterGrant) {
             Toast.makeText(this, "Allow SMS permission so Teen Mode can automatically alert the parent.", Toast.LENGTH_LONG).show()
-            smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
         }
+        smsPermissionLauncher.launch(Manifest.permission.SEND_SMS)
     }
 
     private fun section(title: String) {

@@ -68,7 +68,7 @@ object TeenModeManager {
     }
 
     fun endDrive() {
-        // Keep counters in memory only for the active trip. A new drive resets them.
+        // Counters are scoped to the active drive and reset on the next start.
     }
 
     fun eventCount(): Int = issueCount
@@ -107,6 +107,28 @@ object TeenModeManager {
             )
         }
 
+        return checkIssueLimit(context)
+    }
+
+    fun onRoadHazard(context: Context, label: String, risk: RoadRisk): String? {
+        if (!isEnabled(context)) return null
+        issueCount += 1
+        if (risk == RoadRisk.HAZARD && FeatureSettings.enabled(context, FeatureSettings.KEY_TEEN_MAJOR_ROAD, true)) {
+            return sendParentAlert(
+                context,
+                "Driver Guard TEEN ALERT: MAJOR - Road Guard detected $label in the forward lane. Drive issue count: $issueCount."
+            )
+        }
+        return checkIssueLimit(context)
+    }
+
+    fun sendTestAlert(context: Context): String = sendParentAlert(
+        context,
+        "Driver Guard Teen Mode test alert. Parent notifications are configured on this phone.",
+        bypassRateLimit = true
+    )
+
+    private fun checkIssueLimit(context: Context): String? {
         val limit = FeatureSettings.int(context, FeatureSettings.KEY_TEEN_EVENT_LIMIT, 3).coerceIn(1, 20)
         if (!limitAlertSent && issueCount >= limit) {
             limitAlertSent = true
@@ -115,15 +137,8 @@ object TeenModeManager {
                 "Driver Guard TEEN ALERT: $issueCount driving warnings/issues have occurred in this drive. Please check in with the driver."
             )
         }
-
         return null
     }
-
-    fun sendTestAlert(context: Context): String = sendParentAlert(
-        context,
-        "Driver Guard Teen Mode test alert. Parent notifications are configured on this phone.",
-        bypassRateLimit = true
-    )
 
     private fun sendParentAlert(
         context: Context,
