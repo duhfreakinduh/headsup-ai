@@ -18,6 +18,7 @@ object FeatureSettings {
     const val KEY_TEEN_EVENT_LIMIT = "teen_event_limit"
     const val KEY_TEEN_MAJOR_EYES = "teen_major_eyes"
     const val KEY_TEEN_MAJOR_PHONE = "teen_major_phone"
+    const val KEY_TEEN_MAJOR_ROAD = "teen_major_road"
     const val KEY_TEEN_MAJOR_ALARM = "teen_major_alarm"
     const val KEY_TEEN_PIN_SALT = "teen_pin_salt"
     const val KEY_TEEN_PIN_HASH = "teen_pin_hash"
