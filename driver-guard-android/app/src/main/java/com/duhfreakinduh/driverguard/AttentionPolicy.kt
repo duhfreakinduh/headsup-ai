@@ -26,11 +26,11 @@ data class PolicyDecision(
 
 class AttentionPolicy {
     companion object {
-        // Real-driving grace periods. A mirror/blind-spot glance should not be treated
-        // like distraction, and a normal/slow blink should not make noise.
-        const val EYE_TRIGGER_MS = 900f
-        const val AWAY_TRIGGER_MS = 1800f
-        const val MISSING_TRIGGER_MS = 1800f
+        // Deliberately forgiving defaults for real driving. Mirror checks and normal
+        // blind-spot glances should stay visual-only and never become audible alerts.
+        const val EYE_TRIGGER_MS = 1200f
+        const val AWAY_TRIGGER_MS = 3500f
+        const val MISSING_TRIGGER_MS = 3000f
     }
 
     private var lastTimestampMs: Long? = null
@@ -50,21 +50,21 @@ class AttentionPolicy {
         lastTimestampMs = timestampMs
 
         if (!input.hasFace) {
-            missingEvidenceMs = (missingEvidenceMs + dt).coerceAtMost(5000f)
-            eyeEvidenceMs = (eyeEvidenceMs - dt * 5f).coerceAtLeast(0f)
-            awayEvidenceMs = (awayEvidenceMs - dt * 4f).coerceAtLeast(0f)
+            missingEvidenceMs = (missingEvidenceMs + dt).coerceAtMost(7000f)
+            eyeEvidenceMs = (eyeEvidenceMs - dt * 8f).coerceAtLeast(0f)
+            awayEvidenceMs = (awayEvidenceMs - dt * 8f).coerceAtLeast(0f)
         } else {
-            missingEvidenceMs = (missingEvidenceMs - dt * 5f).coerceAtLeast(0f)
+            missingEvidenceMs = (missingEvidenceMs - dt * 8f).coerceAtLeast(0f)
             eyeEvidenceMs = if (input.rawEyesClosed) {
-                (eyeEvidenceMs + dt).coerceAtMost(3000f)
+                (eyeEvidenceMs + dt).coerceAtMost(4000f)
             } else {
-                (eyeEvidenceMs - dt * 5f).coerceAtLeast(0f)
+                (eyeEvidenceMs - dt * 7f).coerceAtLeast(0f)
             }
             awayEvidenceMs = if (input.rawAway) {
-                (awayEvidenceMs + dt).coerceAtMost(5000f)
+                (awayEvidenceMs + dt).coerceAtMost(8000f)
             } else {
-                // Clear a mirror glance quickly once the driver looks forward again.
-                (awayEvidenceMs - dt * 4f).coerceAtLeast(0f)
+                // A completed mirror/window check should disappear almost immediately.
+                (awayEvidenceMs - dt * 8f).coerceAtLeast(0f)
             }
         }
 
