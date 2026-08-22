@@ -59,10 +59,10 @@ class AttentionPolicyTest {
     @Test
     fun missingFaceTriggers() {
         val p = AttentionPolicy()
-        p.update(PolicyInput(false, false, false), 0)
-        p.update(PolicyInput(false, false, false), 250)
-        p.update(PolicyInput(false, false, false), 500)
-        val result = p.update(PolicyInput(false, false, false), 750)
+        var result = p.update(PolicyInput(false, false, false), 0)
+        for (time in 100L..800L step 100L) {
+            result = p.update(PolicyInput(false, false, false), time)
+        }
         assertTrue(DriverTrigger.FACE_MISSING in result.triggers)
     }
 
