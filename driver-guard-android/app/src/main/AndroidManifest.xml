@@ -23,6 +23,16 @@
         android:theme="@style/Theme.DriverGuard">
 
         <activity
+            android:name=".SensitivityActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".SettingsHubActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
