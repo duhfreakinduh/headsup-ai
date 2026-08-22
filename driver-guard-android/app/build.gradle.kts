@@ -11,8 +11,8 @@ android {
         applicationId = "com.duhfreakinduh.driverguard"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2-native"
+        versionCode = 4
+        versionName = "1.3-native"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
