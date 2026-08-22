@@ -47,6 +47,15 @@ class AlarmController(private val context: Context) : AutoCloseable, TextToSpeec
             DriverTrigger.FACE_MISSING -> "I cannot see you. Eyes on the road."
             else -> "Eyes on the road."
         }
+        speakAndVibrate(message)
+    }
+
+    fun roadWarning(label: String) {
+        val clean = label.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+        speakAndVibrate("Caution. $clean ahead in your lane.")
+    }
+
+    private fun speakAndVibrate(message: String) {
         if (ttsReady && FeatureSettings.enabled(context, FeatureSettings.KEY_VOICE_WARNINGS, true)) {
             tts.stop()
             tts.speak(message, TextToSpeech.QUEUE_FLUSH, null, "driver-warning")
