@@ -98,7 +98,7 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
         val blend = mutableMapOf<String, Float>()
         val blendshapes = result.faceBlendshapes()
         if (blendshapes.isPresent && blendshapes.get().isNotEmpty()) {
-            for (category in blendshapes.get().first().categories()) {
+            for (category in blendshapes.get().first()) {
                 blend[category.categoryName()] = category.score()
             }
         }
