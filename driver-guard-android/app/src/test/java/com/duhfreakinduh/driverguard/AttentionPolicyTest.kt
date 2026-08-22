@@ -15,14 +15,14 @@ class AttentionPolicyTest {
     }
 
     @Test
-    fun longBlinkUnderSevenTenthsDoesNotTrigger() {
+    fun longBlinkUnderNineTenthsDoesNotTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, true, false), 0)
-        for (time in 100L..600L step 100L) {
+        for (time in 100L..800L step 100L) {
             result = p.update(PolicyInput(true, true, false), time)
         }
         assertFalse(DriverTrigger.EYES_CLOSED in result.triggers)
-        result = p.update(PolicyInput(true, false, false), 700)
+        result = p.update(PolicyInput(true, false, false), 900)
         assertFalse(DriverTrigger.EYES_CLOSED in result.triggers)
     }
 
@@ -30,75 +30,76 @@ class AttentionPolicyTest {
     fun sustainedClosedEyesTriggers() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(true, true, false), 0)
-        for (time in 100L..800L step 100L) {
+        for (time in 100L..1100L step 100L) {
             result = p.update(PolicyInput(true, true, false), time)
         }
         assertTrue(DriverTrigger.EYES_CLOSED in result.triggers)
     }
 
     @Test
-    fun intermittentBadFramesStillAccumulateEvidence() {
+    fun mirrorGlanceUnderOnePointEightSecondsDoesNotTrigger() {
         val p = AttentionPolicy()
-        var result = p.update(PolicyInput(true, true, false), 0)
-        val samples = listOf(
-            100L to true,
-            200L to true,
-            260L to false,
-            340L to true,
-            440L to true,
-            540L to true,
-            640L to true,
-            740L to true,
-            840L to true,
-            940L to true,
-            1040L to true
-        )
-        for ((time, closed) in samples) {
-            result = p.update(PolicyInput(true, closed, false), time)
+        var result = p.update(PolicyInput(true, false, true), 0)
+        for (time in 100L..1700L step 100L) {
+            result = p.update(PolicyInput(true, false, true), time)
         }
-        assertTrue(DriverTrigger.EYES_CLOSED in result.triggers)
+        assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
+        result = p.update(PolicyInput(true, false, false), 1800)
+        assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
     }
 
     @Test
-    fun headTurnTriggers() {
+    fun sustainedHeadTurnEventuallyTriggers() {
         val p = AttentionPolicy()
-        p.update(PolicyInput(true, false, true), 0)
-        p.update(PolicyInput(true, false, true), 120)
-        p.update(PolicyInput(true, false, true), 240)
-        val result = p.update(PolicyInput(true, false, true), 360)
+        var result = p.update(PolicyInput(true, false, true), 0)
+        for (time in 100L..2000L step 100L) {
+            result = p.update(PolicyInput(true, false, true), time)
+        }
         assertTrue(DriverTrigger.HEAD_TURNED in result.triggers)
     }
 
     @Test
-    fun pitchDominantUsesLookingUpDownReason() {
+    fun pitchDominantUsesLookingUpDownReasonAfterGrace() {
         val p = AttentionPolicy()
-        p.update(PolicyInput(true, false, true, true), 0)
-        p.update(PolicyInput(true, false, true, true), 120)
-        p.update(PolicyInput(true, false, true, true), 240)
-        val result = p.update(PolicyInput(true, false, true, true), 360)
+        var result = p.update(PolicyInput(true, false, true, true), 0)
+        for (time in 100L..2000L step 100L) {
+            result = p.update(PolicyInput(true, false, true, true), time)
+        }
         assertTrue(DriverTrigger.LOOKING_UP_DOWN in result.triggers)
     }
 
     @Test
-    fun missingFaceTriggers() {
+    fun briefFaceLossDoesNotTrigger() {
         val p = AttentionPolicy()
         var result = p.update(PolicyInput(false, false, false), 0)
-        for (time in 100L..800L step 100L) {
+        for (time in 100L..1700L step 100L) {
+            result = p.update(PolicyInput(false, false, false), time)
+        }
+        assertFalse(DriverTrigger.FACE_MISSING in result.triggers)
+    }
+
+    @Test
+    fun sustainedFaceLossTriggers() {
+        val p = AttentionPolicy()
+        var result = p.update(PolicyInput(false, false, false), 0)
+        for (time in 100L..2000L step 100L) {
             result = p.update(PolicyInput(false, false, false), time)
         }
         assertTrue(DriverTrigger.FACE_MISSING in result.triggers)
     }
 
     @Test
-    fun recoveryDecaysEyeEvidenceQuickly() {
+    fun recoveryClearsHeadTurnEvidenceQuickly() {
         val p = AttentionPolicy()
-        var result = p.update(PolicyInput(true, true, false), 0)
-        for (time in 100L..800L step 100L) {
-            result = p.update(PolicyInput(true, true, false), time)
+        var result = p.update(PolicyInput(true, false, true), 0)
+        for (time in 100L..1600L step 100L) {
+            result = p.update(PolicyInput(true, false, true), time)
         }
-        assertTrue(DriverTrigger.EYES_CLOSED in result.triggers)
-        result = p.update(PolicyInput(true, false, false), 900)
-        result = p.update(PolicyInput(true, false, false), 1000)
-        assertFalse(DriverTrigger.EYES_CLOSED in result.triggers)
+        assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
+        result = p.update(PolicyInput(true, false, false), 1700)
+        result = p.update(PolicyInput(true, false, false), 1800)
+        result = p.update(PolicyInput(true, false, false), 1900)
+        assertFalse(DriverTrigger.HEAD_TURNED in result.triggers)
+        assertTrue(result.awayEvidenceMs < 600f)
     }
 }

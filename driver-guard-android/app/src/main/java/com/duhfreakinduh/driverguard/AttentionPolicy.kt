@@ -26,9 +26,11 @@ data class PolicyDecision(
 
 class AttentionPolicy {
     companion object {
-        const val EYE_TRIGGER_MS = 700f
-        const val AWAY_TRIGGER_MS = 300f
-        const val MISSING_TRIGGER_MS = 700f
+        // Real-driving grace periods. A mirror/blind-spot glance should not be treated
+        // like distraction, and a normal/slow blink should not make noise.
+        const val EYE_TRIGGER_MS = 900f
+        const val AWAY_TRIGGER_MS = 1800f
+        const val MISSING_TRIGGER_MS = 1800f
     }
 
     private var lastTimestampMs: Long? = null
@@ -48,20 +50,21 @@ class AttentionPolicy {
         lastTimestampMs = timestampMs
 
         if (!input.hasFace) {
-            missingEvidenceMs = (missingEvidenceMs + dt).coerceAtMost(3000f)
-            eyeEvidenceMs = (eyeEvidenceMs - dt * 4f).coerceAtLeast(0f)
-            awayEvidenceMs = (awayEvidenceMs - dt * 3f).coerceAtLeast(0f)
+            missingEvidenceMs = (missingEvidenceMs + dt).coerceAtMost(5000f)
+            eyeEvidenceMs = (eyeEvidenceMs - dt * 5f).coerceAtLeast(0f)
+            awayEvidenceMs = (awayEvidenceMs - dt * 4f).coerceAtLeast(0f)
         } else {
-            missingEvidenceMs = (missingEvidenceMs - dt * 4f).coerceAtLeast(0f)
+            missingEvidenceMs = (missingEvidenceMs - dt * 5f).coerceAtLeast(0f)
             eyeEvidenceMs = if (input.rawEyesClosed) {
-                (eyeEvidenceMs + dt).coerceAtMost(1800f)
+                (eyeEvidenceMs + dt).coerceAtMost(3000f)
             } else {
-                (eyeEvidenceMs - dt * 4f).coerceAtLeast(0f)
+                (eyeEvidenceMs - dt * 5f).coerceAtLeast(0f)
             }
             awayEvidenceMs = if (input.rawAway) {
-                (awayEvidenceMs + dt).coerceAtMost(1800f)
+                (awayEvidenceMs + dt).coerceAtMost(5000f)
             } else {
-                (awayEvidenceMs - dt * 2.2f).coerceAtLeast(0f)
+                // Clear a mirror glance quickly once the driver looks forward again.
+                (awayEvidenceMs - dt * 4f).coerceAtLeast(0f)
             }
         }
 

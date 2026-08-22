@@ -135,25 +135,32 @@ class FaceAttentionEngine(context: Context) : AutoCloseable {
         )
 
         val b = baseline
-        val rawEyes = if (b == null) {
-            metrics.blinkAvg >= 0.48f ||
-                (metrics.blinkLeft > 0.45f && metrics.blinkRight > 0.45f) ||
-                (metrics.ear in 0.001f..0.155f)
-        } else {
-            val blinkThreshold = max(0.36f, b.blink + 0.15f).coerceAtMost(0.62f)
-            val earThreshold = max(0.03f, b.ear * 0.67f)
-            metrics.blinkAvg >= blinkThreshold ||
-                (metrics.blinkLeft > 0.42f && metrics.blinkRight > 0.42f) ||
-                (metrics.ear > 0f && metrics.ear < earThreshold)
-        }
-
+        var yawDelta = 0f
+        var pitchDelta = 0f
         var rawAway = false
         var pitchDominant = false
         if (b != null) {
-            val yawDelta = abs(metrics.yaw - b.yaw)
-            val pitchDelta = abs(metrics.pitch - b.pitch)
-            rawAway = yawDelta > 0.07f || pitchDelta > 0.10f
-            pitchDominant = pitchDelta > 0.10f && pitchDelta >= yawDelta
+            yawDelta = abs(metrics.yaw - b.yaw)
+            pitchDelta = abs(metrics.pitch - b.pitch)
+            // A normal mirror glance can move the head a fair amount. Use a larger
+            // pose threshold and let AttentionPolicy apply a long grace period.
+            rawAway = yawDelta > 0.105f || pitchDelta > 0.16f
+            pitchDominant = pitchDelta > 0.16f && pitchDelta >= yawDelta
+        }
+
+        val strongAway = b != null && (yawDelta > 0.16f || pitchDelta > 0.22f)
+        val rawEyes = if (b == null) {
+            metrics.blinkAvg >= 0.62f ||
+                (metrics.blinkLeft > 0.58f && metrics.blinkRight > 0.58f) ||
+                (metrics.ear in 0.001f..0.12f)
+        } else {
+            val blinkThreshold = max(0.52f, b.blink + 0.22f).coerceAtMost(0.72f)
+            val earThreshold = max(0.03f, b.ear * 0.54f)
+            metrics.blinkAvg >= blinkThreshold ||
+                (metrics.blinkLeft > 0.55f && metrics.blinkRight > 0.55f) ||
+                // Side-profile mirror checks can compress the eye geometry and fake a
+                // low EAR. Do not use EAR as proof of closed eyes during a strong turn.
+                (!strongAway && metrics.ear > 0f && metrics.ear < earThreshold)
         }
 
         val decision = policy.update(
